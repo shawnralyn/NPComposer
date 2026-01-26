@@ -11,8 +11,10 @@ bash scripts/download_data.sh
 ```
 
 Downloads:
-- `coconut_csv_full.csv` (~208 MB) → CSV with SMILES and properties
-- `coconut_sdf_3d_full.sdf` (~305 MB) → 3D structures
+- `coconut_csv_full.zip` → CSV with SMILES and properties
+- `coconut_sdf_3d_full.zip` → 3D structures
+
+Unzip and Remove ZIP files
 
 ---
 
