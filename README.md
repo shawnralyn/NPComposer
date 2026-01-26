@@ -1,4 +1,4 @@
-# Natural Product Generation Project
+# NPComposer
 
 Small-scale NP generation using COCONUT dataset.
 
