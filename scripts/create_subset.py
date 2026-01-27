@@ -1,6 +1,6 @@
 """
 COCONUT Subset Creator
-SA filtering + K-means clustering (CSV + SDF)
+SA filtering + K-medoids clustering (CSV + SDF)
 
 Usage:
     python create_subset.py -i data/raw/coconut_csv_full.csv -o data/processed/subset_5k -s 5000
@@ -22,7 +22,7 @@ from rdkit.Chem import QED
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
 
-from sklearn.cluster import MiniBatchKMeans
+from sklearn_extra.cluster import KMedoids
 
 try:
     from tqdm import tqdm
@@ -120,14 +120,14 @@ def load_and_filter(
     return df, smiles_col
 
 
-def kmeans_subset(
+def kmedoids_subset(
     df: pd.DataFrame,
     smiles_col: str,
     target_size: int = 5000,
     seed: int = 42
 ) -> pd.DataFrame:
     
-    print(f"K-means clustering (n={target_size})...")
+    print(f"K-medoids clustering (n={target_size})...")
     
     if len(df) <= target_size:
         print(f"  Data ({len(df)}) <= target, returning all")
@@ -149,30 +149,18 @@ def kmeans_subset(
     X = np.array(fps)
     print(f"  {len(X):,} fingerprints")
     
-    # Use more clusters to account for empty ones
-    n_clusters = min(int(target_size * 1.1), len(X))
-    print(f"  Clustering (k={n_clusters})...")
-    kmeans = MiniBatchKMeans(
-        n_clusters=n_clusters,
+    print(f"  Clustering (k={target_size})...")
+    kmedoids = KMedoids(
+        n_clusters=target_size,
         random_state=seed,
-        batch_size=1024,
-        n_init=3
+        method='alternate',
+        max_iter=100
     )
-    labels = kmeans.fit_predict(X)
+    kmedoids.fit(X)
     
-    print("  Selecting representatives...")
-    selected = []
-    for cid in range(n_clusters):
-        if len(selected) >= target_size:
-            break
-        mask = labels == cid
-        if not mask.any():
-            continue
-        cluster_idx = np.where(mask)[0]
-        center = kmeans.cluster_centers_[cid]
-        dists = np.linalg.norm(X[mask] - center, axis=1)
-        closest = cluster_idx[np.argmin(dists)]
-        selected.append(valid_idx[closest])
+    # Medoids are actual data points
+    medoid_indices = kmedoids.medoid_indices_
+    selected = [valid_idx[i] for i in medoid_indices]
     
     subset = df.loc[selected].copy()
     print(f"  Selected {len(subset):,} molecules")
@@ -274,7 +262,7 @@ def main():
         args.input, args.smiles_col, args.sa_max, args.mw_min, args.mw_max
     )
     
-    subset = kmeans_subset(df, smiles_col, args.size, args.seed)
+    subset = kmedoids_subset(df, smiles_col, args.size, args.seed)
     
     csv_path = f"{args.output}.csv"
     id_col = save_subset(subset, csv_path, smiles_col)
