@@ -1,77 +1,66 @@
 # scripts/
 
-Data processing scripts for COCONUT subset creation.
-
 ## download_data.sh
 
-Download and extract COCONUT dataset.
+Download COCONUT dataset.
 
 ```bash
 bash scripts/download_data.sh
 ```
 
-Downloads:
-- `coconut_csv_full.csv` (~208 MB) → CSV with SMILES and properties
-- `coconut_sdf_3d_full.sdf` (~305 MB) → 3D structures
+## download_npass.sh
 
----
-
-## analyze_sdf.py
-
-Analyze SDF file structure and molecular properties.
+Download NPASS 3.0 dataset.
 
 ```bash
-# Basic usage
-python analyze_sdf.py -i data/raw/coconut_sdf_3d_full.sdf
-
-# More samples
-python analyze_sdf.py -i data/raw/coconut_sdf_3d_full.sdf -n 5000
-
-# Save to file
-python analyze_sdf.py -i data/raw/coconut_sdf_3d_full.sdf -o report.txt
+bash scripts/download_npass.sh
 ```
 
-**Output:** molecule count, properties, 3D coords info, MW/atom stats, atom types
+## merge_npass.py
 
----
+Merge NPASS files into single CSV.
+
+```bash
+python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv
+```
 
 ## create_subset.py
 
-Create diverse subset from COCONUT (CSV + SDF) using SA filtering + K-medoids.
+Create subset using SA filtering + K-medoids clustering.
 
 ```bash
-# CSV only
-python create_subset.py -i data/raw/coconut_csv_full.csv -o data/processed/subset_5k -s 5000
+# COCONUT
+python create_subset.py -i data/raw/coconut_csv_full.csv -o data/processed/coconut_5k -s 5000
 
-# CSV + SDF
-python create_subset.py -i data/raw/coconut_csv_full.csv --sdf data/raw/coconut_sdf_3d_full.sdf -o data/processed/subset_5k -s 5000
+# NPASS
+python create_subset.py -i data/raw/npass_full.csv -o data/processed/npass_5k -s 5000
 
-# Stricter SA filter
-python create_subset.py -i data/raw/coconut_csv_full.csv --sdf data/raw/coconut_sdf_3d_full.sdf -o data/processed/subset_5k -s 5000 --sa_max 4.0
+# With SDF
+python create_subset.py -i data/raw/coconut_csv_full.csv --sdf data/raw/coconut_sdf_3d_full.sdf -o data/processed/coconut_5k -s 5000
 ```
 
 **Options:**
-- `-s, --size`: Target subset size (default: 5000)
-- `--sdf`: Input SDF file (optional, extracts matching molecules)
-- `--sa_max`: Max SA score (default: 6.0)
-- `--mw_min/--mw_max`: MW range (default: 150-800)
-
-**Output:**
-- `{output}.csv` - Subset CSV with sa_score, qed, npl_score
-- `{output}.sdf` - Subset SDF with 3D structures (if --sdf provided)
-
----
+| Option | Default | Description |
+|--------|---------|-------------|
+| -s, --size | 5000 | Target subset size |
+| --sdf | None | Input SDF (optional) |
+| --sa_max | 6.0 | Max SA score |
+| --mw_min | 150 | Min molecular weight |
+| --mw_max | 800 | Max molecular weight |
 
 ## split_data.py
 
-Split subset into train/val/test sets.
+Split into train/val/test.
 
 ```bash
-# Default 80/10/10 split
-python split_data.py -i subset_5k.csv -o splits/
-
-# Custom split ratio
-python split_data.py -i subset_5k.csv -o splits/ --train 0.7 --val 0.15 --test 0.15
+python split_data.py -i data/processed/coconut_5k.csv -o data/splits/
+python split_data.py -i data/processed/coconut_5k.csv -o data/splits/ --train 0.7 --val 0.15 --test 0.15
 ```
 
-**Output:** train.csv, val.csv, test.csv in output directory
+## analyze_sdf.py
+
+Analyze SDF file structure.
+
+```bash
+python analyze_sdf.py -i data/raw/coconut_sdf_3d_full.sdf -n 5000
+```

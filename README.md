@@ -1,20 +1,26 @@
 # NPComposer
 
-Small-scale NP generation using COCONUT dataset.
+Natural product generation using COCONUT and NPASS datasets.
 
 ## Structure
 
 ```
 NPComposer/
 ├── data/
-│   ├── raw/                    # COCONUT data (download manually)
-│   ├── processed/              # Filtered subset
+│   ├── raw/                    # Original data
+│   │   ├── npass/              # NPASS files
+│   │   ├── coconut_csv_full.csv
+│   │   └── coconut_sdf_3d_full.sdf
+│   ├── processed/              # Filtered subsets
 │   └── splits/                 # Train/Val/Test
 │
 ├── scripts/
-│   ├── analyze_sdf.py          # Analyze SDF structure
-│   ├── create_subset.py        # Create subset (SA + K-medoids)
-│   └── split_data.py           # Train/Val/Test split
+│   ├── download_data.sh        # Download COCONUT
+│   ├── download_npass.sh       # Download NPASS
+│   ├── merge_npass.py          # Merge NPASS files
+│   ├── create_subset.py        # Create subset (K-medoids)
+│   ├── split_data.py           # Train/Val/Test split
+│   └── analyze_sdf.py          # Analyze SDF structure
 │
 └── src/
     └── evaluation/
@@ -24,45 +30,41 @@ NPComposer/
 ## Setup
 
 ```bash
-pip install rdkit pandas numpy scikit-learn scikit-learn-extra tqdm
+pip install -r requirements.txt
 ```
 
 ## Usage
 
 ```bash
-# 1. Download COCONUT data
+# COCONUT
 bash scripts/download_data.sh
+python scripts/create_subset.py -i data/raw/coconut_csv_full.csv --sdf data/raw/coconut_sdf_3d_full.sdf -o data/processed/coconut_5k -s 5000
 
-# 2. Create subset (CSV + SDF)
-python scripts/create_subset.py \
-    -i data/raw/coconut_csv_full.csv \
-    --sdf data/raw/coconut_sdf_3d_full.sdf \
-    -o data/processed/subset_5k \
-    -s 5000
+# NPASS
+bash scripts/download_npass.sh
+python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv
+python scripts/create_subset.py -i data/raw/npass_full.csv -o data/processed/npass_5k -s 5000
 
-# 3. Split into train/val/test
-python scripts/split_data.py -i data/processed/subset_5k.csv -o data/splits/
-
-# 4. Evaluate generated molecules
+# Split & Evaluate
+python scripts/split_data.py -i data/processed/coconut_5k.csv -o data/splits/
 python src/evaluation/metrics.py -i generated.txt -o results.json
 ```
 
 ## Pipeline
 
 ```
-COCONUT (715K)
+Raw Data (COCONUT 715K / NPASS 100K+)
     ↓ Valid SMILES filter
     ↓ MW filter (150-800)
     ↓ SA filter (<= 6.0)
-    ↓ K-medoids clustering
+    ↓ K-medoids (Tanimoto + SA/QED/NPL)
 Subset (5K) → Train/Val/Test
 ```
 
-## Subset Columns
+## Computed Columns (RDKit)
 
-| Column | Description |
-|--------|-------------|
-| canonical_smiles | Normalized SMILES |
-| npl_score | NP-likeness (COCONUT) |
-| sa_score | Synthetic accessibility (RDKit) |
-| qed | Drug-likeness (RDKit) |
+| Column | Description | Range |
+|--------|-------------|-------|
+| sa_score(RDKit) | Synthetic accessibility | 1-10 (lower=easier) |
+| qed(RDKit) | Drug-likeness | 0-1 (higher=better) |
+| npl_score(RDKit) | NP-likeness | -3~+3 (higher=more NP-like) |
