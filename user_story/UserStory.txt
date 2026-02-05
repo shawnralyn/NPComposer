@@ -1,56 +1,19 @@
-{\rtf1\ansi\ansicpg949\cocoartf2822
-\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 HelveticaNeue;}
-{\colortbl;\red255\green255\blue255;}
-{\*\expandedcolortbl;;}
-{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat21\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid1\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid1}
-{\list\listtemplateid2\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat22\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid101\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid2}
-{\list\listtemplateid3\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat23\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid201\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid3}
-{\list\listtemplateid4\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat24\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid301\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid4}
-{\list\listtemplateid5\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat25\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid401\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid5}
-{\list\listtemplateid6\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat26\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid501\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid6}
-{\list\listtemplateid7\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat27\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid601\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid7}
-{\list\listtemplateid8\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat28\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid701\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid8}
-{\list\listtemplateid9\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat29\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid801\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid9}}
-{\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}{\listoverride\listid2\listoverridecount0\ls2}{\listoverride\listid3\listoverridecount0\ls3}{\listoverride\listid4\listoverridecount0\ls4}{\listoverride\listid5\listoverridecount0\ls5}{\listoverride\listid6\listoverridecount0\ls6}{\listoverride\listid7\listoverridecount0\ls7}{\listoverride\listid8\listoverridecount0\ls8}{\listoverride\listid9\listoverridecount0\ls9}}
-\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
-\deftab560
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls1\ilvl0
-\f0\fs26 \cf0 {\listtext	0.	}Dr. Kim is a medicinal chemist at a small pharmaceutical company. She wants to generate novel NP-like drug candidates that are both synthetically feasible and patentable. She needs high NP-likeness with low SA scores, and desires a tool that outputs ready-to-synthesize SMILES. Her chemistry expertise is deep but her coding skills are limited to basic Python scripts.\
-\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls2\ilvl0\cf0 {\listtext	0.	}Mr.Song is an ML researcher at an AI lab. He wants to benchmark molecular generation methods using NP datasets. He needs standardized evaluation metrics, fair comparison protocols, and well-curated datasets. He has advanced ML skills but limited chemistry background.\
-\pard\pardeftab560\slleading20\pardirnatural\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls3\ilvl0\cf0 {\listtext	0.	}Dr. Lee is a traditional medicine researcher. She wants to modernize herbal compound discovery by generating analogs of known ethnobotanical compounds. She needs organism source linking and culturally informed compound selection. She is a domain expert with beginner-level coding skills.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls4\ilvl0\cf0 {\listtext	0.	}Mr.Choi is a patent attorney at a pharmaceutical firm. He wants to assess the novelty of generated molecules against existing databases. He needs a uniqueness checking tool with clear reports and database cross-referencing. He has no technical background.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls5\ilvl0\cf0 {\listtext	0.	}Dr. Park is an antibiotic discovery researcher. She wants to generate antimicrobial NP candidates to address drug-resistant bacteria. She needs activity-conditioned generation. She has intermediate ML skills and deep microbiology expertise.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls6\ilvl0\cf0 {\listtext	0.	}Mr. Norris is an undergraduate student. He wants to learn molecular generation for his capstone project. He needs easy setup, clear documentation. He is a beginner in both ML and chemistry.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls7\ilvl0\cf0 {\listtext	0.	}Dr. Hamilton is a clinical pharmacologist. He wants to optimize NP leads for better oral bioavailability. He needs QED optimization and property prediction. He is a domain expert with basic scripting ability.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls8\ilvl0\cf0 {\listtext	0.	}Dr. Senna is a bioinformatics postdoc. He wants to connect generated NPs to biosynthetic gene clusters for metabolic engineering. He needs multi-modal output linking structures to BGC data. He has advanced coding skills but basic chemistry knowledge.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\pardirnatural\partightenfactor0
-\ls9\ilvl0\cf0 {\listtext	0.	}Mr. Schumacher manages a contract research organization. He wants to offer NP generation as a service to pharmaceutical clients. He needs batch processing, automated report generation, and high reliability. He has an advanced engineering background.\
-\pard\pardeftab560\slleading20\partightenfactor0
-\cf0 \
-\pard\pardeftab560\partightenfactor0
-\cf0 30.	Mr. Verstappen is an open-source community contributor. She wants to extend the model with new datasets and generation methods. She needs modular codebase, clear contribution guidelines, and comprehensive API documentation. She has advanced programming skills and growing chemistry interest.\
-}
+21. Dr. Kim is a medicinal chemist at a small pharmaceutical company. She wants to generate novel NP-like drug candidates that are both synthetically feasible and patentable. She needs high NP-likeness with low SA scores, and desires a tool that outputs ready-to-synthesize SMILES. Her chemistry expertise is deep but her coding skills are limited to basic Python scripts.
+
+22. Mr.Song is an ML researcher at an AI lab. He wants to benchmark molecular generation methods using NP datasets. He needs standardized evaluation metrics, fair comparison protocols, and well-curated datasets. He has advanced ML skills but limited chemistry background.
+
+23. Dr. Lee is a traditional medicine researcher. She wants to modernize herbal compound discovery by generating analogs of known ethnobotanical compounds. She needs organism source linking and culturally informed compound selection. She is a domain expert with beginner-level coding skills.
+
+24. Mr.Choi is a patent attorney at a pharmaceutical firm. He wants to assess the novelty of generated molecules against existing databases. He needs a uniqueness checking tool with clear reports and database cross-referencing. He has no technical background.
+
+25. Dr. Park is an antibiotic discovery researcher. She wants to generate antimicrobial NP candidates to address drug-resistant bacteria. She needs activity-conditioned generation. She has intermediate ML skills and deep microbiology expertise.
+
+26. Mr. Norris is an undergraduate student. He wants to learn molecular generation for his capstone project. He needs easy setup, clear documentation. He is a beginner in both ML and chemistry.
+
+27. Dr. Hamilton is a clinical pharmacologist. He wants to optimize NP leads for better oral bioavailability. He needs QED optimization and property prediction. He is a domain expert with basic scripting ability.
+
+28. Dr. Senna is a bioinformatics postdoc. He wants to connect generated NPs to biosynthetic gene clusters for metabolic engineering. He needs multi-modal output linking structures to BGC data. He has advanced coding skills but basic chemistry knowledge.
+
+29. Mr. Schumacher manages a contract research organization. He wants to offer NP generation as a service to pharmaceutical clients. He needs batch processing, automated report generation, and high reliability. He has an advanced engineering background.
+
+30. Mr. Verstappen is an open-source community contributor. She wants to extend the model with new datasets and generation methods. She needs modular codebase, clear contribution guidelines, and comprehensive API documentation. She has advanced programming skills and growing chemistry interest.
