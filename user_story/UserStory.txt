@@ -16,4 +16,4 @@
 
 29. Mr. Schumacher manages a contract research organization. He wants to offer NP generation as a service to pharmaceutical clients. He needs batch processing, automated report generation, and high reliability. He has an advanced engineering background.
 
-30. Mr. Verstappen is an open-source community contributor. She wants to extend the model with new datasets and generation methods. She needs modular codebase, clear contribution guidelines, and comprehensive API documentation. She has advanced programming skills and growing chemistry interest.
+30. Mr. Verstappen is an open-source community contributor. He wants to extend the model with new datasets and generation methods. He needs modular codebase, clear contribution guidelines, and comprehensive API documentation. He has advanced programming skills and growing chemistry interest.
