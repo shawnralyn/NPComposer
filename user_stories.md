@@ -43,15 +43,15 @@ anticancer drugs. They want to generate molecules with predicted cytotoxcity. Th
 
 20. Huell Babineaux is the CTO of a pharmacutical company and is looking to find new methods his company can use to generate natural-product like drug mimics. While he has a degree in comptuer science, it's been many years since he's written a program.
 
-21. Dr. Kim is a medicinal chemist at a small pharmaceutical company. She wants to generate novel NP-like drug candidates that are both synthetically feasible and patentable. She needs high NP-likeness with low SA scores, and desires a tool that outputs ready-to-synthesize SMILES. Her chemistry expertise is deep but her coding skills are limited to basic Python scripts.
+21. Dr. Sainz is a medicinal chemist at a small pharmaceutical company. She wants to generate novel NP-like drug candidates that are both synthetically feasible and patentable. She needs high NP-likeness with low SA scores, and desires a tool that outputs ready-to-synthesize SMILES. Her chemistry expertise is deep but her coding skills are limited to basic Python scripts.
 
-22. Mr.Song is an ML researcher at an AI lab. He wants to benchmark molecular generation methods using NP datasets. He needs standardized evaluation metrics, fair comparison protocols, and well-curated datasets. He has advanced ML skills but limited chemistry background.
+22. Mr.Leclerc is an ML researcher at an AI lab. He wants to benchmark molecular generation methods using NP datasets. He needs standardized evaluation metrics, fair comparison protocols, and well-curated datasets. He has advanced ML skills but limited chemistry background.
 
-23. Dr. Lee is a traditional medicine researcher. She wants to modernize herbal compound discovery by generating analogs of known ethnobotanical compounds. She needs organism source linking and culturally informed compound selection. She is a domain expert with beginner-level coding skills.
+23. Dr. Russell is a traditional medicine researcher. She wants to modernize herbal compound discovery by generating analogs of known ethnobotanical compounds. She needs organism source linking and culturally informed compound selection. She is a domain expert with beginner-level coding skills.
 
-24. Mr.Choi is a patent attorney at a pharmaceutical firm. He wants to assess the novelty of generated molecules against existing databases. He needs a uniqueness checking tool with clear reports and database cross-referencing. He has no technical background.
+24. Mr.Alonso is a patent attorney at a pharmaceutical firm. He wants to assess the novelty of generated molecules against existing databases. He needs a uniqueness checking tool with clear reports and database cross-referencing. He has no technical background.
 
-25. Dr. Park is an antibiotic discovery researcher. She wants to generate antimicrobial NP candidates to address drug-resistant bacteria. She needs activity-conditioned generation. She has intermediate ML skills and deep microbiology expertise.
+25. Dr. Piastri is an antibiotic discovery researcher. She wants to generate antimicrobial NP candidates to address drug-resistant bacteria. She needs activity-conditioned generation. She has intermediate ML skills and deep microbiology expertise.
 
 26. Mr. Norris is an undergraduate student. He wants to learn molecular generation for his capstone project. He needs easy setup, clear documentation. He is a beginner in both ML and chemistry.
 
