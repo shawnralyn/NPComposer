@@ -26,7 +26,7 @@ filtering:
   sa_max: 6.0
   drop_invalid_smiles: true
 
-# K-medoids Subset Selection
+# K-means Subset Selection
 subset:
   size: 100000
   fp_radius: 2

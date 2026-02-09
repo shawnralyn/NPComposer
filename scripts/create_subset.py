@@ -1,4 +1,4 @@
-"""NP subset creator with SA filtering and K-medoids clustering."""
+"""NP subset creator with SA filtering and K-means clustering."""
 
 import argparse
 import sys
@@ -38,144 +38,63 @@ except ImportError:
     HAS_CLASSYFIRE = False
 
 
-def tanimoto_distance_matrix(X):
-    """Compute pairwise Tanimoto distance matrix (full n*n).
+def kmeans_select(X_combined, target_size, seed=42, oversample=1.1,
+                  batch_size=4096, max_iter=100):
+    """Memory-efficient K-means subset selection with cluster pruning.
+
+    Clusters into ~1.1x target_size, then drops smallest clusters
+    until exactly target_size molecules remain.
 
     Input:
-        X: np.ndarray of shape (n, d), binary fingerprint vectors.
-    Output:
-        np.ndarray of shape (n, n), distance values in [0, 1].
-    """
-    X = np.asarray(X, dtype=np.float64)
-    intersection = np.dot(X, X.T)
-    bits = np.sum(X, axis=1)
-    union = bits[:, None] + bits[None, :] - intersection
-    union = np.where(union == 0, 1, union)
-    return 1 - intersection / union
-
-
-def euclidean_distance_matrix(X):
-    """Compute normalized pairwise Euclidean distance matrix (full n*n).
-
-    Input:
-        X: np.ndarray of shape (n, d).
-    Output:
-        np.ndarray of shape (n, n), normalized to [0, 1].
-    """
-    X = np.asarray(X, dtype=np.float64)
-    sq_sum = np.sum(X ** 2, axis=1)
-    dist = sq_sum[:, None] + sq_sum[None, :] - 2 * np.dot(X, X.T)
-    dist = np.sqrt(np.maximum(dist, 0))
-    max_dist = dist.max()
-    if max_dist > 0:
-        dist = dist / max_dist
-    return dist
-
-
-def _tanimoto_cross(A, B):
-    """Tanimoto distance between rows of A and rows of B.
-
-    Input:
-        A: np.ndarray of shape (m, d), float32 fingerprints.
-        B: np.ndarray of shape (p, d), float32 fingerprints.
-    Output:
-        np.ndarray of shape (m, p), Tanimoto distances in [0, 1].
-    """
-    inter = A @ B.T
-    bits_a = A.sum(axis=1)
-    bits_b = B.sum(axis=1)
-    union = bits_a[:, None] + bits_b[None, :] - inter
-    union = np.where(union == 0, 1, union)
-    return 1.0 - inter / union
-
-
-def _euclidean_cross_norm(A, B, norm_factor):
-    """Normalized Euclidean distance between rows of A and rows of B.
-
-    Input:
-        A: np.ndarray of shape (m, d).
-        B: np.ndarray of shape (p, d).
-        norm_factor: float, normalization divisor (e.g. sqrt(ndim)).
-    Output:
-        np.ndarray of shape (m, p), distances in [0, ~1].
-    """
-    sq_a = (A ** 2).sum(axis=1)
-    sq_b = (B ** 2).sum(axis=1)
-    d2 = sq_a[:, None] + sq_b[None, :] - 2.0 * A @ B.T
-    return np.sqrt(np.maximum(d2, 0)) / max(norm_factor, 1e-10)
-
-
-def kmedoids_combined(X_fp, X_props, n_clusters, max_iter=100, seed=42,
-                      fp_weight=0.7, chunk_size=2000):
-    """Memory-efficient K-medoids on combined Tanimoto + Euclidean distance.
-
-    Avoids building the full n*n distance matrix. Instead, computes
-    distances in chunks during assignment (n*k per chunk) and uses
-    small within-cluster matrices for medoid updates.
-
-    Memory: O(chunk_size * k + max_cluster_size^2) instead of O(n^2).
-
-    Input:
-        X_fp: np.ndarray, fingerprint matrix (n, d).
-        X_props: np.ndarray, property matrix (n, p), values in [0, 1].
-        n_clusters: int, number of medoids to select.
-        max_iter: int, maximum iterations.
+        X_combined: np.ndarray (n, d), feature matrix (FP + properties).
+        target_size: int, desired number of molecules.
         seed: int, random seed (default 42).
-        fp_weight: float, weight for Tanimoto vs Euclidean distance.
-        chunk_size: int, batch size for distance computation.
+        oversample: float, cluster multiplier (default 1.1).
+        batch_size: int, MiniBatchKMeans batch size.
+        max_iter: int, maximum iterations.
     Output:
-        np.ndarray of selected medoid indices.
+        np.ndarray of selected indices.
     """
-    np.random.seed(seed)
-    n = len(X_fp)
-    p = X_props.shape[1]
-    norm_factor = np.sqrt(p)
+    from sklearn.cluster import MiniBatchKMeans
 
-    X_fp_f32 = np.asarray(X_fp, dtype=np.float32)
-    X_props_f32 = np.asarray(X_props, dtype=np.float32)
+    n_clusters = int(target_size * oversample)
+    n_clusters = min(n_clusters, len(X_combined))
+    print(f"    MiniBatchKMeans (k={n_clusters}, batch={batch_size})...")
 
-    medoid_indices = np.random.choice(n, n_clusters, replace=False)
+    X_f32 = np.asarray(X_combined, dtype=np.float32)
+    kmeans = MiniBatchKMeans(
+        n_clusters=n_clusters, batch_size=batch_size,
+        max_iter=max_iter, random_state=seed, n_init=3
+    )
+    labels = kmeans.fit_predict(X_f32)
 
-    for it in range(max_iter):
-        # Assignment: find nearest medoid for each point (chunked)
-        med_fp = X_fp_f32[medoid_indices]
-        med_props = X_props_f32[medoid_indices]
-        labels = np.empty(n, dtype=np.int32)
+    # Count members per cluster, sort by size ascending
+    cluster_ids, counts = np.unique(labels, return_counts=True)
+    order = np.argsort(counts)
+    sorted_ids = cluster_ids[order]
+    sorted_counts = counts[order]
 
-        for start in range(0, n, chunk_size):
-            end = min(start + chunk_size, n)
-            d_tan = _tanimoto_cross(X_fp_f32[start:end], med_fp)
-            d_euc = _euclidean_cross_norm(X_props_f32[start:end], med_props,
-                                          norm_factor)
-            d = fp_weight * d_tan + (1 - fp_weight) * d_euc
-            labels[start:end] = np.argmin(d, axis=1)
-            del d_tan, d_euc, d
-
-        # Update: find best medoid in each cluster
-        new_medoids = np.empty(n_clusters, dtype=np.intp)
-        for k in range(n_clusters):
-            cluster_idx = np.where(labels == k)[0]
-            if len(cluster_idx) == 0:
-                new_medoids[k] = medoid_indices[k]
-                continue
-            if len(cluster_idx) == 1:
-                new_medoids[k] = cluster_idx[0]
-                continue
-
-            cl_fp = X_fp_f32[cluster_idx]
-            cl_props = X_props_f32[cluster_idx]
-            d_tan = _tanimoto_cross(cl_fp, cl_fp)
-            d_euc = _euclidean_cross_norm(cl_props, cl_props, norm_factor)
-            d = fp_weight * d_tan + (1 - fp_weight) * d_euc
-            best = np.argmin(d.sum(axis=1))
-            new_medoids[k] = cluster_idx[best]
-
-        if np.array_equal(new_medoids, medoid_indices):
-            print(f"    Converged at iteration {it + 1}")
+    # Drop smallest clusters until total <= target_size
+    total = int(counts.sum())
+    drop_set = set()
+    for cid, cnt in zip(sorted_ids, sorted_counts):
+        if total <= target_size:
             break
-        medoid_indices = new_medoids
+        drop_set.add(cid)
+        total -= cnt
 
-    return medoid_indices
+    keep_mask = np.array([lb not in drop_set for lb in labels])
+    selected = np.where(keep_mask)[0]
+
+    # If still over target, randomly trim from remaining
+    if len(selected) > target_size:
+        rng = np.random.RandomState(seed)
+        selected = rng.choice(selected, target_size, replace=False)
+        selected.sort()
+
+    print(f"    Kept {n_clusters - len(drop_set)} clusters, "
+          f"dropped {len(drop_set)} smallest")
+    return selected
 
 
 def calc_sa(smiles: str) -> Optional[float]:
@@ -370,18 +289,22 @@ def load_and_filter(input_path, smiles_col=None, sa_max=6.0,
     return df, smiles_col
 
 
-def kmedoids_subset(df, smiles_col, target_size=100000, seed=42):
-    """Select diverse subset via K-medoids clustering.
+def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7):
+    """Select diverse subset via K-means clustering with oversampling and pruning.
+
+    Creates 1.1x target clusters, then removes smallest clusters first
+    until exactly target_size molecules remain.
 
     Input:
         df: filtered DataFrame with SMILES and computed properties.
         smiles_col: name of SMILES column.
         target_size: number of molecules to select.
         seed: random seed (default 42).
+        fp_weight: float, weight for fingerprint features vs properties.
     Output:
         pd.DataFrame subset of selected molecules.
     """
-    print(f"K-medoids clustering (n={target_size})...")
+    print(f"K-means subset selection (n={target_size})...")
 
     if len(df) <= target_size:
         print(f"  Data ({len(df)}) <= target, returning all")
@@ -402,7 +325,7 @@ def kmedoids_subset(df, smiles_col, target_size=100000, seed=42):
             fps.append(fp)
             valid_idx.append(idx)
 
-    X_fp = np.array(fps)
+    X_fp = np.array(fps, dtype=np.float32)
     print(f"  {len(X_fp):,} fingerprints")
 
     valid_df = df.loc[valid_idx]
@@ -432,16 +355,14 @@ def kmedoids_subset(df, smiles_col, target_size=100000, seed=42):
         X_props = np.column_stack([sa_norm, qed_norm])
         print("  Properties: SA, QED (normalized)")
 
-    # Estimate memory usage
-    chunk_sz = min(2000, len(X_fp))
-    mem_mb = chunk_sz * target_size * 4 / 1024 / 1024
-    print(f"  Chunked K-medoids (chunk={chunk_sz}, ~{mem_mb:.0f} MB/chunk)")
-    print(f"  Clustering (k={target_size}, Tanimoto + Euclidean)...")
-    medoid_indices = kmedoids_combined(X_fp, X_props, target_size,
-                                       max_iter=100, seed=seed,
-                                       chunk_size=chunk_sz)
+    # Combine FP and properties with weighting
+    prop_weight = 1.0 - fp_weight
+    X_combined = np.hstack([X_fp * fp_weight, X_props * prop_weight])
+    print(f"  Feature dim: {X_combined.shape[1]} (FP={X_fp.shape[1]}, props={X_props.shape[1]})")
 
-    selected = [valid_idx[i] for i in medoid_indices]
+    selected_idx = kmeans_select(X_combined, target_size, seed=seed)
+
+    selected = [valid_idx[i] for i in selected_idx]
     subset = df.loc[selected].copy()
     print(f"  Selected {len(subset):,} molecules")
     return subset
@@ -535,7 +456,7 @@ def main():
     df, smiles_col = load_and_filter(
         args.input, args.smiles_col, args.sa_max, args.max_atoms, args.max_rings
     )
-    subset = kmedoids_subset(df, smiles_col, args.size, args.seed)
+    subset = kmeans_subset(df, smiles_col, args.size, args.seed)
 
     # ClassyFire superclass classification
     if args.classify:

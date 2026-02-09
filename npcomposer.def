@@ -25,7 +25,7 @@ From: continuumio/miniconda3:24.7.1-0
         # Bind local data directory
         apptainer exec --bind ./data:/app/data npcomposer.sif \
             python scripts/create_subset.py -i /app/data/raw/coconut_csv_full.csv \
-            -o /app/data/processed/coconut_100k -s 100000
+            -o /app/data/processed/coconut_100000 -s 100000
 
 %environment
     export CONDA_DEFAULT_ENV=npcomposer

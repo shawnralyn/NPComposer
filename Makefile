@@ -75,7 +75,7 @@ merge-npass: ## Merge NPASS TSV files into single CSV
 	@test -d $(NPASS_DIR) || { echo "Error: $(NPASS_DIR) not found. Run 'make download-npass' first."; exit 1; }
 	$(PYTHON) scripts/merge_npass.py -i $(NPASS_DIR) -o $(NPASS_MERGED)
 
-# Subset Creation (K-medoids)
+# Subset Creation (K-means)
 
 .PHONY: subset-coconut
 subset-coconut: ## Create COCONUT subset

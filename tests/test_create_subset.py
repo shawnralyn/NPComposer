@@ -9,9 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from create_subset import (
-    tanimoto_distance_matrix,
-    euclidean_distance_matrix,
-    kmedoids_combined,
+    kmeans_select,
     calc_sa,
     calc_qed,
     calc_npl,
@@ -22,74 +20,31 @@ from create_subset import (
 )
 
 
-class TestTanimotoDistanceMatrix:
-    def test_identity(self):
-        X = np.eye(3, dtype=np.float64)
-        D = tanimoto_distance_matrix(X)
-        # diagonal should be 0 (distance to self)
-        np.testing.assert_array_almost_equal(np.diag(D), 0.0)
-
-    def test_symmetry(self):
-        rng = np.random.default_rng(42)
-        X = rng.integers(0, 2, size=(5, 10)).astype(np.float64)
-        D = tanimoto_distance_matrix(X)
-        np.testing.assert_array_almost_equal(D, D.T)
-
-    def test_range(self):
-        rng = np.random.default_rng(42)
-        X = rng.integers(0, 2, size=(10, 20)).astype(np.float64)
-        D = tanimoto_distance_matrix(X)
-        assert D.min() >= 0.0
-        assert D.max() <= 1.0
-
-    def test_zero_vectors(self):
-        X = np.zeros((3, 5), dtype=np.float64)
-        D = tanimoto_distance_matrix(X)
-        # union=0 → treated as 1 → distance = 1 - 0/1 = 1, but diag 0/0 → 0
-        np.testing.assert_array_almost_equal(np.diag(D), 0.0)
-
-
-class TestEuclideanDistanceMatrix:
-    def test_identity(self):
-        X = np.eye(3, dtype=np.float64)
-        D = euclidean_distance_matrix(X)
-        np.testing.assert_array_almost_equal(np.diag(D), 0.0)
-
-    def test_symmetry(self):
-        rng = np.random.default_rng(42)
-        X = rng.random((5, 3))
-        D = euclidean_distance_matrix(X)
-        np.testing.assert_array_almost_equal(D, D.T)
-
-    def test_normalized(self):
-        rng = np.random.default_rng(42)
-        X = rng.random((10, 5))
-        D = euclidean_distance_matrix(X)
-        assert D.max() <= 1.0 + 1e-10
-
-
-class TestKmedoids:
+class TestKmeansSelect:
     def test_returns_correct_count(self):
         rng = np.random.default_rng(42)
-        X_fp = rng.integers(0, 2, size=(20, 32)).astype(np.float64)
-        X_props = rng.random((20, 2))
-        medoids = kmedoids_combined(X_fp, X_props, n_clusters=5, max_iter=10)
-        assert len(medoids) == 5
+        X = rng.random((100, 20)).astype(np.float32)
+        selected = kmeans_select(X, target_size=30, seed=42)
+        assert len(selected) == 30
 
-    def test_medoids_are_unique(self):
+    def test_selected_are_unique(self):
         rng = np.random.default_rng(42)
-        X_fp = rng.integers(0, 2, size=(30, 32)).astype(np.float64)
-        X_props = rng.random((30, 2))
-        medoids = kmedoids_combined(X_fp, X_props, n_clusters=10, max_iter=10)
-        assert len(set(medoids)) == 10
+        X = rng.random((100, 20)).astype(np.float32)
+        selected = kmeans_select(X, target_size=50, seed=42)
+        assert len(set(selected)) == len(selected)
 
-    def test_medoids_in_range(self):
+    def test_selected_in_range(self):
+        n = 80
         rng = np.random.default_rng(42)
-        n = 25
-        X_fp = rng.integers(0, 2, size=(n, 16)).astype(np.float64)
-        X_props = rng.random((n, 3))
-        medoids = kmedoids_combined(X_fp, X_props, n_clusters=5, max_iter=10)
-        assert all(0 <= m < n for m in medoids)
+        X = rng.random((n, 10)).astype(np.float32)
+        selected = kmeans_select(X, target_size=20, seed=42)
+        assert all(0 <= s < n for s in selected)
+
+    def test_returns_all_if_small(self):
+        rng = np.random.default_rng(42)
+        X = rng.random((10, 5)).astype(np.float32)
+        selected = kmeans_select(X, target_size=10, seed=42)
+        assert len(selected) == 10
 
 
 class TestCalcSA:

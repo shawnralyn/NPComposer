@@ -26,21 +26,21 @@ python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv
 
 ## create_subset.py
 
-Create subset using SA filtering + K-medoids clustering. Default seed: 42.
+Create subset using SA filtering + K-means clustering. Default seed: 42.
 
 ```bash
 # COCONUT
 python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
-    -o data/processed/coconut_100k -s 100000
+    -o data/processed/coconut_100000 -s 100000
 
 # NPASS
 python scripts/create_subset.py -i data/raw/npass_full.csv \
-    -o data/processed/npass_100k -s 100000
+    -o data/processed/npass_100000 -s 100000
 
 # With SDF + ClassyFire
 python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
     --sdf data/raw/coconut_sdf_3d_full.sdf \
-    -o data/processed/coconut_100k -s 100000 --classify
+    -o data/processed/coconut_100000 -s 100000 --classify
 ```
 
 | Option | Default | Description |
