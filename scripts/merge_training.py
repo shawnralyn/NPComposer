@@ -1,0 +1,119 @@
+"""Merge COCONUT and NPASS subsets into a single training dataset.
+
+Input:
+    --coconut: path to COCONUT subset CSV.
+    --npass: path to NPASS subset CSV.
+    -o/--output: output CSV path.
+Output:
+    CSV with unified columns, source tag, and deduplicated by SMILES.
+"""
+
+import argparse
+from pathlib import Path
+
+import pandas as pd
+
+
+SMILES_CANDIDATES = [
+    "canonical_smiles", "SMILES", "smiles", "Canonical_SMILES", "smi",
+]
+
+
+def detect_smiles_col(df):
+    """Detect SMILES column name from DataFrame.
+
+    Input:
+        df: pandas DataFrame.
+    Output:
+        str, detected column name.
+    """
+    for c in SMILES_CANDIDATES:
+        if c in df.columns:
+            return c
+    raise ValueError(f"No SMILES column found. Columns: {list(df.columns)}")
+
+
+def load_subset(path, source_name):
+    """Load subset CSV and add source column.
+
+    Input:
+        path: CSV file path.
+        source_name: dataset name tag (e.g. 'coconut', 'npass').
+    Output:
+        pandas DataFrame with 'source' column added.
+    """
+    df = pd.read_csv(path)
+    df["source"] = source_name
+    print(f"Loaded {source_name}: {len(df):,} rows, {len(df.columns)} cols")
+    return df
+
+
+def unify_columns(df, smiles_col):
+    """Ensure standard column naming.
+
+    Input:
+        df: pandas DataFrame.
+        smiles_col: original SMILES column name.
+    Output:
+        pandas DataFrame with 'smiles' column guaranteed.
+    """
+    if smiles_col != "smiles":
+        df = df.rename(columns={smiles_col: "smiles"})
+    return df
+
+
+def merge_and_deduplicate(dfs):
+    """Concatenate DataFrames and drop duplicate SMILES.
+
+    Input:
+        dfs: list of pandas DataFrames, each with 'smiles' column.
+    Output:
+        pandas DataFrame, deduplicated.
+    """
+    merged = pd.concat(dfs, ignore_index=True)
+    n_before = len(merged)
+    merged = merged.drop_duplicates(subset="smiles", keep="first")
+    n_after = len(merged)
+    if n_before != n_after:
+        print(f"Removed {n_before - n_after:,} duplicate SMILES")
+    return merged
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Merge subsets into training data")
+    parser.add_argument("--coconut", required=True, help="COCONUT subset CSV")
+    parser.add_argument("--npass", required=True, help="NPASS subset CSV")
+    parser.add_argument("-o", "--output", required=True, help="Output CSV path")
+    args = parser.parse_args()
+
+    frames = []
+    for path, name in [(args.coconut, "coconut"), (args.npass, "npass")]:
+        df = load_subset(path, name)
+        scol = detect_smiles_col(df)
+        df = unify_columns(df, scol)
+        frames.append(df)
+
+    merged = merge_and_deduplicate(frames)
+
+    # Reorder: smiles and source first, rest alphabetical
+    priority = ["smiles", "source"]
+    rest = sorted([c for c in merged.columns if c not in priority])
+    merged = merged[priority + rest]
+
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    merged.to_csv(args.output, index=False)
+
+    print(f"\nTraining data saved: {args.output}")
+    print(f"  Total: {len(merged):,} molecules")
+    for src in ["coconut", "npass"]:
+        n = (merged["source"] == src).sum()
+        print(f"  {src}: {n:,}")
+
+    kept = [c for c in merged.columns if c not in ("smiles", "source")]
+    print(f"  Columns ({len(merged.columns)}): smiles, source, {', '.join(kept[:10])}")
+    if len(kept) > 10:
+        print(f"    ... and {len(kept) - 10} more")
+
+
+if __name__ == "__main__":
+    main()

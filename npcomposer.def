@@ -1,0 +1,141 @@
+Bootstrap: docker
+From: continuumio/miniconda3:24.7.1-0
+
+%labels
+    Author NPComposer Team
+    Version 1.0
+    Description Natural product generation using COCONUT and NPASS datasets
+
+%help
+    NPComposer — Natural Product Generation Pipeline
+
+    Usage:
+        # Build the image
+        apptainer build npcomposer.sif npcomposer.def
+
+        # Interactive shell
+        apptainer shell npcomposer.sif
+
+        # Run full pipeline (requires data in data/raw/)
+        apptainer run npcomposer.sif
+
+        # Run specific command
+        apptainer exec npcomposer.sif python scripts/create_subset.py --help
+
+        # Bind local data directory
+        apptainer exec --bind ./data:/app/data npcomposer.sif \
+            python scripts/create_subset.py -i /app/data/raw/coconut_csv_full.csv \
+            -o /app/data/processed/coconut_100k -s 100000
+
+%environment
+    export CONDA_DEFAULT_ENV=npcomposer
+    export PATH=/opt/conda/envs/npcomposer/bin:$PATH
+    export PYTHONDONTWRITEBYTECODE=1
+
+%files
+    requirements.txt /app/requirements.txt
+    scripts/ /app/scripts/
+    src/ /app/src/
+    conf/ /app/conf/
+    tests/ /app/tests/
+    Makefile /app/Makefile
+
+%post
+    # System packages
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        unzip \
+        make \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+    # Conda environment
+    conda create -n npcomposer python=3.10 -y
+    conda install -n npcomposer -c conda-forge \
+        rdkit=2023.09 \
+        numpy \
+        pandas \
+        scikit-learn \
+        tqdm \
+        -y
+
+    # Pip packages (inside conda env)
+    /opt/conda/envs/npcomposer/bin/pip install --no-cache-dir \
+        hydra-core>=1.3.0 \
+        omegaconf>=2.3.0 \
+        pytest>=7.0.0
+
+    # Setup RDKit Contrib (SA_Score, NP_Score)
+    RDKIT_CONTRIB=$(/opt/conda/envs/npcomposer/bin/python -c \
+        "import os, rdkit; print(os.path.join(os.path.dirname(rdkit.__file__), 'Contrib'))")
+    if [ -d "$RDKIT_CONTRIB/SA_Score" ]; then
+        touch "$RDKIT_CONTRIB/SA_Score/__init__.py" 2>/dev/null || true
+    fi
+    if [ -d "$RDKIT_CONTRIB/NP_Score" ]; then
+        touch "$RDKIT_CONTRIB/NP_Score/__init__.py" 2>/dev/null || true
+    fi
+
+    # Create data directories
+    mkdir -p /app/data/raw /app/data/processed /app/data/splits
+
+    # Cleanup
+    conda clean -afy
+    rm -rf /root/.cache/pip
+
+%runscript
+    #!/bin/bash
+    echo "NPComposer Pipeline"
+    echo ""
+
+    cd /app
+
+    # If arguments are passed, run them directly
+    if [ $# -gt 0 ]; then
+        exec "$@"
+    fi
+
+    # Default: show help
+    echo "Available commands:"
+    echo "  apptainer exec npcomposer.sif python scripts/create_subset.py --help"
+    echo "  apptainer exec npcomposer.sif python scripts/split_data.py --help"
+    echo "  apptainer exec npcomposer.sif python scripts/merge_npass.py --help"
+    echo "  apptainer exec npcomposer.sif python scripts/merge_training.py --help"
+    echo "  apptainer exec npcomposer.sif python scripts/analyze_sdf.py --help"
+    echo "  apptainer exec npcomposer.sif python src/evaluation/metrics.py --help"
+    echo ""
+    echo "Full pipeline (bind your data dir):"
+    echo "  apptainer exec --bind ./data:/app/data npcomposer.sif make pipeline-coconut"
+    echo ""
+    echo "Run tests:"
+    echo "  apptainer exec npcomposer.sif make test"
+
+%test
+    echo "=== Verifying NPComposer container ==="
+
+    python --version
+
+    python -c "import rdkit; print(f'RDKit {rdkit.__version__}')"
+    python -c "import pandas; print(f'pandas {pandas.__version__}')"
+    python -c "import numpy; print(f'NumPy {numpy.__version__}')"
+    python -c "import sklearn; print(f'scikit-learn {sklearn.__version__}')"
+    python -c "import hydra; print(f'Hydra {hydra.__version__}')"
+    python -c "import tqdm; print(f'tqdm {tqdm.__version__}')"
+
+    python -c "from rdkit.Contrib.SA_Score import sascorer; print('SA_Score OK')"
+    python -c "
+try:
+    from rdkit.Contrib.NP_Score import npscorer
+    m = npscorer.readNPModel()
+    print('NP_Score OK')
+except Exception as e:
+    print(f'NP_Score skipped: {e}')
+"
+
+    cd /app
+    python -c "from scripts.create_subset import calc_sa; print('create_subset OK')"
+    python -c "from scripts.split_data import split_data; print('split_data OK')"
+
+    cd /app && python -m pytest tests/ -v --tb=short || true
+
+    echo "=== Container verification complete ==="

@@ -1,0 +1,69 @@
+# NPComposer Hydra Configuration
+#
+# Usage:
+#   python scripts/create_subset.py   (reads defaults below)
+#   python scripts/create_subset.py filtering.sa_max=5.0 subset.size=100000
+#
+# Override any value from the CLI with dot-notation.
+# See: https://hydra.cc/docs/intro/
+
+defaults:
+  - _self_
+
+# Data Paths
+paths:
+  coconut_csv: data/raw/coconut_csv_full.csv
+  coconut_sdf: data/raw/coconut_sdf_3d_full.sdf
+  npass_dir: data/raw/npass
+  npass_merged: data/raw/npass_full.csv
+  processed_dir: data/processed
+  splits_dir: data/splits
+
+# Molecular Filtering
+filtering:
+  max_atoms: 150
+  max_rings: 10
+  sa_max: 6.0
+  drop_invalid_smiles: true
+
+# K-medoids Subset Selection
+subset:
+  size: 100000
+  fp_radius: 2
+  fp_nbits: 1024
+  max_iter: 100
+  fp_weight: 0.7
+  classify: true
+  seed: 42
+
+# Train / Val / Test Split
+split:
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  seed: 42
+
+# SDF Analysis
+analysis:
+  n_samples: 1000
+
+# Evaluation Metrics
+evaluation:
+  metrics:
+    - validity
+    - sa_score
+    - qed
+    - np_score
+
+# NPASS Merge Settings
+npass_merge:
+  required_files:
+    - NPASS3.0_naturalproducts_generalinfo.txt
+    - NPASS3.0_naturalproducts_structure.txt
+  optional_files:
+    - NPASS3.0_activities.txt
+    - NPASS3.0_naturalproducts_species_pair.txt
+    - NPASS3.0_target.txt
+    - NPASS3.0_species_info.txt
+    - NPASS3.0_toxicity.txt
+  agg_max_items: 5

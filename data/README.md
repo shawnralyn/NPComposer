@@ -53,8 +53,6 @@ Download: `bash scripts/download_data.sh`
 | synonyms | Synonyms |
 | cas | CAS number |
 
----
-
 ### NPASS
 
 Download: `bash scripts/download_npass.sh && python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv`
@@ -84,27 +82,26 @@ Download: `bash scripts/download_npass.sh && python scripts/merge_npass.py -i da
 | toxicity_types | Toxicity types |
 | toxicity_value_mean | Mean toxicity value |
 
----
-
 ## processed/
 
-Output from `scripts/create_subset.py`
+Output from `scripts/create_subset.py` and `scripts/merge_training.py`.
 
 Files:
-- `coconut_5k.csv` - COCONUT subset
-- `coconut_5k.sdf` - COCONUT 3D structures
-- `npass_5k.csv` - NPASS subset
 
-**Added columns (RDKit):**
+- `coconut_100000.csv` — COCONUT subset (100K)
+- `coconut_100000.sdf` — COCONUT 3D structures
+- `npass_100000.csv` — NPASS subset (100K)
+- `training_data.csv` — Merged training dataset (COCONUT + NPASS, deduplicated)
+
+Added columns (RDKit):
 
 | Column | Description |
 |--------|-------------|
 | sa_score(RDKit) | Synthetic accessibility (1-10) |
 | qed(RDKit) | Drug-likeness (0-1) |
 | npl_score(RDKit) | NP-likeness (-3~+3) |
-| molecular_weight | MW (if not present) |
-
----
+| superclass | ClassyFire superclass (with --classify) |
+| source | Dataset origin: coconut or npass (training_data.csv only) |
 
 ## splits/
 
