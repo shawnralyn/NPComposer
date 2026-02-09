@@ -84,7 +84,7 @@ Download: `bash scripts/download_npass.sh && python scripts/merge_npass.py -i da
 
 ## processed/
 
-Output from `scripts/create_subset.py` and `scripts/merge_training.py`.
+Output from `scripts/create_subset.py`, `scripts/merge_training.py`, and `scripts/analyze_distribution.py`.
 
 Files:
 
@@ -92,6 +92,11 @@ Files:
 - `coconut_100000.sdf` — COCONUT 3D structures
 - `npass_100000.csv` — NPASS subset (100K)
 - `training_data.csv` — Merged training dataset (COCONUT + NPASS, deduplicated)
+- `dist_coconut_histograms.png` — COCONUT raw vs processed distribution histograms
+- `dist_coconut_summary.csv` — COCONUT distribution summary statistics
+- `dist_coconut_superclass.csv` — COCONUT superclass distribution comparison
+- `dist_npass_histograms.png` — NPASS raw vs processed distribution histograms
+- `dist_npass_summary.csv` — NPASS distribution summary statistics
 
 Added columns (RDKit):
 

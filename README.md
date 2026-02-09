@@ -22,6 +22,7 @@ NPComposer/
 │   ├── create_subset.py        # Create subset (K-means)
 │   ├── merge_training.py       # Merge subsets into training data
 │   ├── split_data.py           # Train/Val/Test split
+│   ├── analyze_distribution.py # Raw vs processed distribution analysis
 │   └── analyze_sdf.py          # Analyze SDF structure
 ├── src/
 │   ├── classification/
@@ -127,9 +128,11 @@ Raw Data (COCONUT 715K / NPASS 203K)
     ↓ Atom count filter (<= 150)
     ↓ Ring count filter (<= 10)
     ↓ SA filter (<= 6.0)
-    ↓ K-means clustering (FP + SA/QED/NPL)
+    ↓ Tanimoto space embedding (FP → PCA 3D)
+    ↓ K-means clustering (Tanimoto FP + SA/QED/NPL)
     ↓ ClassyFire superclass labeling
 Subset (100K each) → Merge → training_data.csv → Train/Val/Test (seed=42)
+    ↓ Distribution analysis (raw vs processed histograms + stats)
 ```
 
 ## Computed Columns (RDKit)

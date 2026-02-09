@@ -1,4 +1,4 @@
-"""NP subset creator with SA filtering and K-means clustering."""
+"""NP subset creator with SA filtering and K-means clustering in Tanimoto space."""
 
 import argparse
 import sys
@@ -289,11 +289,13 @@ def load_and_filter(input_path, smiles_col=None, sa_max=6.0,
     return df, smiles_col
 
 
-def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7):
-    """Select diverse subset via K-means clustering with oversampling and pruning.
+def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7,
+                  fp_dim=3):
+    """Select diverse subset via K-means in Tanimoto fingerprint space.
 
-    Creates 1.1x target clusters, then removes smallest clusters first
-    until exactly target_size molecules remain.
+    Binary Morgan fingerprints are reduced to fp_dim dimensions via PCA,
+    combined with molecular properties, then clustered with
+    MiniBatchKMeans (1.1x oversampling + smallest cluster pruning).
 
     Input:
         df: filtered DataFrame with SMILES and computed properties.
@@ -301,9 +303,12 @@ def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7):
         target_size: number of molecules to select.
         seed: random seed (default 42).
         fp_weight: float, weight for fingerprint features vs properties.
+        fp_dim: int, PCA output dimensions for fingerprint space (default 3).
     Output:
         pd.DataFrame subset of selected molecules.
     """
+    from sklearn.decomposition import PCA
+
     print(f"K-means subset selection (n={target_size})...")
 
     if len(df) <= target_size:
@@ -326,7 +331,15 @@ def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7):
             valid_idx.append(idx)
 
     X_fp = np.array(fps, dtype=np.float32)
-    print(f"  {len(X_fp):,} fingerprints")
+    print(f"  {len(X_fp):,} fingerprints ({X_fp.shape[1]} bits)")
+
+    # Reduce FP to Tanimoto space via PCA
+    n_components = min(fp_dim, X_fp.shape[1], len(X_fp))
+    pca = PCA(n_components=n_components, random_state=seed)
+    X_fp_reduced = pca.fit_transform(X_fp)
+    var_explained = pca.explained_variance_ratio_.sum()
+    print(f"  Tanimoto space: {X_fp.shape[1]} -> {n_components} dims "
+          f"({var_explained:.1%} variance)")
 
     valid_df = df.loc[valid_idx]
     sa_vals = valid_df['sa_score(RDKit)'].fillna(valid_df['sa_score(RDKit)'].mean()).values
@@ -355,10 +368,11 @@ def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7):
         X_props = np.column_stack([sa_norm, qed_norm])
         print("  Properties: SA, QED (normalized)")
 
-    # Combine FP and properties with weighting
+    # Combine reduced FP and properties with weighting
     prop_weight = 1.0 - fp_weight
-    X_combined = np.hstack([X_fp * fp_weight, X_props * prop_weight])
-    print(f"  Feature dim: {X_combined.shape[1]} (FP={X_fp.shape[1]}, props={X_props.shape[1]})")
+    X_combined = np.hstack([X_fp_reduced * fp_weight, X_props * prop_weight])
+    print(f"  Feature dim: {X_combined.shape[1]} "
+          f"(FP={X_fp_reduced.shape[1]}, props={X_props.shape[1]})")
 
     selected_idx = kmeans_select(X_combined, target_size, seed=seed)
 
@@ -445,6 +459,7 @@ def main():
     parser.add_argument("--max_atoms", type=int, default=150, help="Max atom count")
     parser.add_argument("--max_rings", type=int, default=10, help="Max ring count")
     parser.add_argument("--smiles_col", help="SMILES column (auto-detect if not set)")
+    parser.add_argument("--fp_dim", type=int, default=3, help="PCA dims for Tanimoto space")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--classify", action="store_true",
                         help="Add ClassyFire superclass labels")
@@ -456,7 +471,7 @@ def main():
     df, smiles_col = load_and_filter(
         args.input, args.smiles_col, args.sa_max, args.max_atoms, args.max_rings
     )
-    subset = kmeans_subset(df, smiles_col, args.size, args.seed)
+    subset = kmeans_subset(df, smiles_col, args.size, args.seed, fp_dim=args.fp_dim)
 
     # ClassyFire superclass classification
     if args.classify:

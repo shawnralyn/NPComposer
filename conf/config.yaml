@@ -26,11 +26,12 @@ filtering:
   sa_max: 6.0
   drop_invalid_smiles: true
 
-# K-means Subset Selection
+# K-means Subset Selection (Tanimoto space)
 subset:
   size: 100000
   fp_radius: 2
   fp_nbits: 1024
+  fp_dim: 3
   max_iter: 100
   fp_weight: 0.7
   classify: true

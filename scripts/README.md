@@ -26,7 +26,7 @@ python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv
 
 ## create_subset.py
 
-Create subset using SA filtering + K-means clustering. Default seed: 42.
+Create subset using SA filtering + K-means clustering in Tanimoto fingerprint space. Default seed: 42.
 
 ```bash
 # COCONUT
@@ -50,6 +50,7 @@ python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
 | --sa_max | 6.0 | Max SA score |
 | --max_atoms | 150 | Max atom count |
 | --max_rings | 10 | Max ring count |
+| --fp_dim | 3 | PCA dimensions for Tanimoto space |
 | --seed | 42 | Random seed |
 | --classify | false | Add ClassyFire superclass labels |
 
@@ -79,6 +80,24 @@ python scripts/split_data.py -i data/processed/coconut_100000.csv -o data/splits
 python scripts/split_data.py -i data/processed/coconut_100000.csv -o data/splits/ \
     --train 0.7 --val 0.15 --test 0.15 --seed 42
 ```
+
+## analyze_distribution.py
+
+Compare property distributions between raw and processed datasets. Generates histograms and summary statistics for MW, atom count, ring count, SA, QED, NPL, and superclass.
+
+```bash
+python scripts/analyze_distribution.py \
+    --raw data/raw/coconut_csv_full.csv \
+    --processed data/processed/coconut_100000.csv \
+    -o data/processed/dist_coconut
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| --raw | (required) | Raw dataset CSV |
+| --processed | (required) | Processed subset CSV |
+| -o, --output | (required) | Output prefix |
+| --sample | 10000 | Max rows to sample from raw for RDKit computation |
 
 ## analyze_sdf.py
 

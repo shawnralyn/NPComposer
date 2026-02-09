@@ -8,6 +8,7 @@
 #   make pipeline-coconut   COCONUT pipeline (subset -> split)
 #   make pipeline-npass     NPASS pipeline (merge -> subset -> split)
 #   make merge-training     Merge COCONUT + NPASS subsets into training_data.csv
+#   make analyze-dist       Compare raw vs processed distributions
 #   make test               Run pytest
 #   make apptainer          Build Apptainer SIF image
 #   make clean              Remove generated artifacts
@@ -23,6 +24,7 @@ SIZE         ?= 100000
 SA_MAX       ?= 6.0
 MAX_ATOMS    ?= 150
 MAX_RINGS    ?= 10
+FP_DIM       ?= 3
 SEED         ?= 42
 CLASSIFY     ?= true
 TRAIN_RATIO  ?= 0.8
@@ -75,7 +77,7 @@ merge-npass: ## Merge NPASS TSV files into single CSV
 	@test -d $(NPASS_DIR) || { echo "Error: $(NPASS_DIR) not found. Run 'make download-npass' first."; exit 1; }
 	$(PYTHON) scripts/merge_npass.py -i $(NPASS_DIR) -o $(NPASS_MERGED)
 
-# Subset Creation (K-means)
+# Subset Creation (K-means in Tanimoto space)
 
 .PHONY: subset-coconut
 subset-coconut: ## Create COCONUT subset
@@ -89,6 +91,7 @@ subset-coconut: ## Create COCONUT subset
 		--sa_max $(SA_MAX) \
 		--max_atoms $(MAX_ATOMS) \
 		--max_rings $(MAX_RINGS) \
+		--fp_dim $(FP_DIM) \
 		--seed $(SEED) \
 		$(if $(filter true,$(CLASSIFY)),--classify,)
 
@@ -103,6 +106,7 @@ subset-npass: ## Create NPASS subset
 		--sa_max $(SA_MAX) \
 		--max_atoms $(MAX_ATOMS) \
 		--max_rings $(MAX_RINGS) \
+		--fp_dim $(FP_DIM) \
 		--seed $(SEED) \
 		$(if $(filter true,$(CLASSIFY)),--classify,)
 
@@ -162,6 +166,23 @@ endif
 		-o results.json \
 		$(if $(filter true,$(CLASSIFY)),--classify,)
 
+# Distribution Analysis
+
+.PHONY: analyze-dist
+analyze-dist: ## Compare raw vs processed distributions (histograms + stats)
+	@test -f $(COCONUT_CSV) || { echo "Error: $(COCONUT_CSV) not found."; exit 1; }
+	@test -f $(DATA_PROCESSED)/coconut_$(SIZE).csv || { echo "Error: coconut subset not found. Run 'make subset-coconut' first."; exit 1; }
+	$(PYTHON) scripts/analyze_distribution.py \
+		--raw $(COCONUT_CSV) \
+		--processed $(DATA_PROCESSED)/coconut_$(SIZE).csv \
+		-o $(DATA_PROCESSED)/dist_coconut
+	@if [ -f $(NPASS_MERGED) ] && [ -f $(DATA_PROCESSED)/npass_$(SIZE).csv ]; then \
+		$(PYTHON) scripts/analyze_distribution.py \
+			--raw $(NPASS_MERGED) \
+			--processed $(DATA_PROCESSED)/npass_$(SIZE).csv \
+			-o $(DATA_PROCESSED)/dist_npass; \
+	fi
+
 # Full Pipelines
 
 .PHONY: pipeline-coconut
@@ -171,7 +192,7 @@ pipeline-coconut: subset-coconut split-coconut ## Full COCONUT pipeline: subset 
 pipeline-npass: merge-npass subset-npass split-npass ## Full NPASS pipeline: merge -> subset -> split
 
 .PHONY: pipeline-all
-pipeline-all: pipeline-coconut pipeline-npass merge-training ## Run both pipelines + merge
+pipeline-all: pipeline-coconut pipeline-npass merge-training analyze-dist ## Run both pipelines + merge + analyze
 
 # One-shot targets (setup + download + pipeline)
 
@@ -216,7 +237,7 @@ run: $(SIF_NAME) ## Run default pipeline inside container
 
 .PHONY: clean
 clean: ## Remove processed data, splits, and caches
-	rm -rf $(DATA_PROCESSED)/*.csv $(DATA_PROCESSED)/*.sdf
+	rm -rf $(DATA_PROCESSED)/*.csv $(DATA_PROCESSED)/*.sdf $(DATA_PROCESSED)/*.png
 	rm -rf $(DATA_SPLITS)/*.csv
 	rm -rf results.json
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
