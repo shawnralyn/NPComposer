@@ -71,9 +71,11 @@ def merge_npass(input_dir, output_path):
 
     print("Aggregating activities...")
     if len(activities) > 0:
+        activities['activity_value'] = pd.to_numeric(
+            activities['activity_value'], errors='coerce')
         act_agg = activities.groupby('np_id').agg({
             'target_id': 'count',
-            'activity_type': lambda x: '|'.join(x.dropna().unique()[:5]),
+            'activity_type': lambda x: '|'.join(x.dropna().astype(str).unique()[:5]),
             'activity_value': 'mean'
         }).rename(columns={
             'target_id': 'activity_count',
@@ -84,19 +86,26 @@ def merge_npass(input_dir, output_path):
 
     print("Aggregating species...")
     if len(species_pair) > 0:
-        sp_agg = species_pair.groupby('np_id').agg({
-            'org_id': 'count',
-            'org_name': lambda x: '|'.join(x.dropna().unique()[:5])
-        }).rename(columns={
-            'org_id': 'organism_count',
-            'org_name': 'organisms'
-        }).reset_index()
+        sp_cols = species_pair.columns.tolist()
+        name_col = next((c for c in ['org_name', 'species_name', 'name']
+                         if c in sp_cols), None)
+        count_col = next((c for c in ['org_id', 'species_id']
+                          if c in sp_cols), sp_cols[1] if len(sp_cols) > 1 else sp_cols[0])
+        agg_dict = {count_col: 'count'}
+        rename_dict = {count_col: 'organism_count'}
+        if name_col:
+            agg_dict[name_col] = lambda x: '|'.join(x.dropna().astype(str).unique()[:5])
+            rename_dict[name_col] = 'organisms'
+        sp_agg = species_pair.groupby('np_id').agg(agg_dict).rename(
+            columns=rename_dict).reset_index()
         df = df.merge(sp_agg, on='np_id', how='left')
 
     print("Aggregating toxicity...")
     if len(toxicity) > 0:
+        toxicity['activity_value'] = pd.to_numeric(
+            toxicity['activity_value'], errors='coerce')
         tox_agg = toxicity.groupby('np_id').agg({
-            'activity_type': lambda x: '|'.join(x.dropna().unique()[:3]),
+            'activity_type': lambda x: '|'.join(x.dropna().astype(str).unique()[:3]),
             'activity_value': 'mean'
         }).rename(columns={
             'activity_type': 'toxicity_types',
