@@ -5,13 +5,22 @@ Input:
     --npass: path to NPASS subset CSV.
     -o/--output: output CSV path.
 Output:
-    CSV with unified columns, source tag, and deduplicated by SMILES.
+    CSV with unified columns, source tag, superclass labels,
+    and deduplicated by SMILES.
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src" / "classification"))
+try:
+    from classyfire import classify_batch
+    HAS_CLASSYFIRE = True
+except ImportError:
+    HAS_CLASSYFIRE = False
 
 
 SMILES_CANDIDATES = [
@@ -79,6 +88,45 @@ def merge_and_deduplicate(dfs):
     return merged
 
 
+def fill_superclass(df, cache_dir="."):
+    """Ensure every row has a superclass label.
+
+    Priority: superclass > np_classifier_superclass > chemical_super_class.
+    Remaining NaN values are filled via ClassyFire API.
+
+    Input:
+        df: merged DataFrame with 'smiles' column.
+        cache_dir: directory for ClassyFire cache file.
+    Output:
+        pandas DataFrame with 'superclass' column filled.
+    """
+    # Unify from existing columns
+    if "superclass" not in df.columns:
+        df["superclass"] = pd.NA
+
+    fallback_cols = ["np_classifier_superclass", "chemical_super_class"]
+    for col in fallback_cols:
+        if col in df.columns:
+            mask = df["superclass"].isna()
+            df.loc[mask, "superclass"] = df.loc[mask, col]
+
+    missing = df["superclass"].isna()
+    n_missing = missing.sum()
+    print(f"Superclass: {len(df) - n_missing:,} filled, {n_missing:,} missing")
+
+    if n_missing > 0 and HAS_CLASSYFIRE:
+        print(f"Classifying {n_missing:,} molecules via ClassyFire API...")
+        missing_smiles = df.loc[missing, "smiles"].tolist()
+        labels = classify_batch(missing_smiles, cache_dir=cache_dir)
+        df.loc[missing, "superclass"] = labels
+
+    elif n_missing > 0:
+        print("Warning: ClassyFire not available, filling with 'Unknown'")
+        df.loc[missing, "superclass"] = "Unknown"
+
+    return df
+
+
 def main():
     parser = argparse.ArgumentParser(description="Merge subsets into training data")
     parser.add_argument("--coconut", required=True, help="COCONUT subset CSV")
@@ -94,6 +142,10 @@ def main():
         frames.append(df)
 
     merged = merge_and_deduplicate(frames)
+
+    # Fill superclass for all molecules
+    cache_dir = str(Path(args.output).parent)
+    merged = fill_superclass(merged, cache_dir=cache_dir)
 
     # Reorder: smiles and source first, rest alphabetical
     priority = ["smiles", "source"]

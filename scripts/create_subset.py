@@ -1,14 +1,24 @@
 """NP subset creator with SA filtering and K-means clustering in Tanimoto space."""
 
 import argparse
+import os
 import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import Optional, Set
 from collections import Counter
+from multiprocessing import Pool, cpu_count
 import warnings
 warnings.filterwarnings('ignore')
+
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
+N_JOBS = 1
 
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors, DataStructs
@@ -38,122 +48,203 @@ except ImportError:
     HAS_CLASSYFIRE = False
 
 
-def kmeans_select(X_combined, target_size, seed=42, oversample=1.1,
-                  batch_size=4096, max_iter=100):
-    """Memory-efficient K-means subset selection with cluster pruning.
+def _torch_nearest(X, centers, data_chunk=4096, center_chunk=20000):
+    """Assign each row of X to its nearest center (chunked for memory).
 
-    Clusters into ~1.1x target_size, then drops smallest clusters
-    until exactly target_size molecules remain.
+    Input:
+        X: torch.Tensor (n, d).
+        centers: torch.Tensor (k, d).
+        data_chunk: rows per chunk.
+        center_chunk: centers per chunk.
+    Output:
+        torch.LongTensor (n,) of cluster assignments.
+    """
+    n, k = X.shape[0], centers.shape[0]
+    labels = torch.empty(n, dtype=torch.long, device=X.device)
+    for i in range(0, n, data_chunk):
+        xi = X[i:min(i + data_chunk, n)]
+        m = len(xi)
+        if k <= center_chunk:
+            labels[i:i + m] = torch.cdist(xi, centers).argmin(1)
+        else:
+            best_d = torch.full((m,), float('inf'), device=X.device)
+            best_k = torch.zeros(m, dtype=torch.long, device=X.device)
+            for j in range(0, k, center_chunk):
+                cj = centers[j:min(j + center_chunk, k)]
+                d = torch.cdist(xi, cj)
+                md, mi = d.min(1)
+                upd = md < best_d
+                best_d[upd] = md[upd]
+                best_k[upd] = mi[upd] + j
+            labels[i:i + m] = best_k
+    return labels
+
+
+def _kmeans_torch(X_np, n_clusters, batch_size, max_iter, seed):
+    """Mini-batch K-means via torch (GPU/CPU).
+
+    Input:
+        X_np: np.ndarray (n, d).
+        n_clusters: int.
+        batch_size: int.
+        max_iter: int.
+        seed: int.
+    Output:
+        tuple of (np.ndarray labels, np.ndarray centers).
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    n, d = X_np.shape
+    print(f"    K-means (k={n_clusters}, batch={batch_size}, "
+          f"iter={max_iter}, device={device})...")
+
+    X = torch.from_numpy(np.ascontiguousarray(X_np, dtype=np.float32)).to(device)
+    gen = torch.Generator()
+    gen.manual_seed(seed)
+    init_idx = torch.randperm(n, generator=gen)[:n_clusters]
+    centers = X[init_idx].clone()
+    counts = torch.ones(n_clusters, device=device)
+
+    for it in range(max_iter):
+        bidx = torch.randint(0, n, (batch_size,), generator=gen)
+        batch = X[bidx]
+        assignments = _torch_nearest(batch, centers)
+
+        sums = torch.zeros(n_clusters, d, device=device)
+        cnts = torch.zeros(n_clusters, device=device)
+        sums.index_add_(0, assignments, batch)
+        cnts.index_add_(0, assignments,
+                        torch.ones(batch_size, device=device))
+
+        active = cnts > 0
+        counts[active] += cnts[active]
+        lr = (cnts[active] / counts[active]).unsqueeze(1)
+        batch_means = sums[active] / cnts[active].unsqueeze(1)
+        centers[active] += lr * (batch_means - centers[active])
+
+        if (it + 1) % 10 == 0:
+            print(f"      iter {it+1}/{max_iter}")
+
+    print("    Assigning all points...")
+    labels = _torch_nearest(X, centers).cpu().numpy()
+    return labels, centers.cpu().numpy()
+
+
+def _kmeans_sklearn(X_np, n_clusters, batch_size, max_iter, seed):
+    """Mini-batch K-means via sklearn (fallback when torch unavailable).
+
+    Input:
+        X_np: np.ndarray (n, d).
+        n_clusters: int.
+        batch_size: int.
+        max_iter: int.
+        seed: int.
+    Output:
+        tuple of (np.ndarray labels, np.ndarray centers).
+    """
+    from sklearn.cluster import MiniBatchKMeans
+    print(f"    MiniBatchKMeans (k={n_clusters}, batch={batch_size})...")
+    X_f32 = np.asarray(X_np, dtype=np.float32)
+    kmeans = MiniBatchKMeans(
+        n_clusters=n_clusters, batch_size=batch_size,
+        max_iter=max_iter, random_state=seed, n_init=1
+    )
+    labels = kmeans.fit_predict(X_f32)
+    return labels, kmeans.cluster_centers_
+
+
+def kmeans_select(X_combined, target_size, seed=42, oversample=1.2,
+                  batch_size=4096, max_iter=1000):
+    """K-means subset selection: oversample clusters, prune, centroid select.
+
+    1. Cluster into target_size * oversample groups.
+    2. Drop smallest clusters until target_size clusters remain.
+    3. Select closest-to-centroid molecule from each surviving cluster.
 
     Input:
         X_combined: np.ndarray (n, d), feature matrix (FP + properties).
         target_size: int, desired number of molecules.
         seed: int, random seed (default 42).
-        oversample: float, cluster multiplier (default 1.1).
-        batch_size: int, MiniBatchKMeans batch size.
-        max_iter: int, maximum iterations.
+        oversample: float, cluster multiplier (default 1.2).
+        batch_size: int, mini-batch size (default 4096).
+        max_iter: int, maximum iterations (default 1000).
     Output:
         np.ndarray of selected indices.
     """
-    from sklearn.cluster import MiniBatchKMeans
+    n = len(X_combined)
+    n_clusters = min(int(target_size * oversample), n)
 
-    n_clusters = int(target_size * oversample)
-    n_clusters = min(n_clusters, len(X_combined))
-    print(f"    MiniBatchKMeans (k={n_clusters}, batch={batch_size})...")
+    if HAS_TORCH:
+        labels, centers = _kmeans_torch(X_combined, n_clusters, batch_size,
+                                        max_iter, seed)
+    else:
+        print("    torch not available, falling back to sklearn")
+        labels, centers = _kmeans_sklearn(X_combined, n_clusters, batch_size,
+                                          max_iter, seed)
 
-    X_f32 = np.asarray(X_combined, dtype=np.float32)
-    kmeans = MiniBatchKMeans(
-        n_clusters=n_clusters, batch_size=batch_size,
-        max_iter=max_iter, random_state=seed, n_init=3
-    )
-    labels = kmeans.fit_predict(X_f32)
-
-    # Count members per cluster, sort by size ascending
+    # Drop smallest clusters until target_size clusters remain
     cluster_ids, counts = np.unique(labels, return_counts=True)
     order = np.argsort(counts)
-    sorted_ids = cluster_ids[order]
-    sorted_counts = counts[order]
+    n_drop = max(0, len(cluster_ids) - target_size)
+    drop_set = set(cluster_ids[order[:n_drop]])
+    keep_ids = [cid for cid in cluster_ids if cid not in drop_set]
 
-    # Drop smallest clusters until total <= target_size
-    total = int(counts.sum())
-    drop_set = set()
-    for cid, cnt in zip(sorted_ids, sorted_counts):
-        if total <= target_size:
-            break
-        drop_set.add(cid)
-        total -= cnt
+    print(f"    Kept {len(keep_ids)} clusters, dropped {n_drop} smallest")
 
-    keep_mask = np.array([lb not in drop_set for lb in labels])
-    selected = np.where(keep_mask)[0]
+    # Select closest-to-centroid from each surviving cluster
+    print("    Selecting closest-to-centroid representatives...")
+    X_f32 = np.asarray(X_combined, dtype=np.float32)
+    selected = []
+    for cid in keep_ids:
+        members = np.where(labels == cid)[0]
+        if len(members) == 0:
+            continue
+        dists = np.linalg.norm(X_f32[members] - centers[cid], axis=1)
+        selected.append(members[np.argmin(dists)])
 
-    # If still over target, randomly trim from remaining
-    if len(selected) > target_size:
-        rng = np.random.RandomState(seed)
-        selected = rng.choice(selected, target_size, replace=False)
-        selected.sort()
-
-    print(f"    Kept {n_clusters - len(drop_set)} clusters, "
-          f"dropped {len(drop_set)} smallest")
+    selected = np.array(selected, dtype=np.int64)
+    selected.sort()
+    print(f"    Selected {len(selected):,} representatives")
     return selected
 
 
-def calc_sa(smiles: str) -> Optional[float]:
-    """Compute synthetic accessibility score.
+def compute_properties(smiles):
+    """Compute all molecular properties from SMILES in a single pass.
+
+    Parses MolFromSmiles once and computes atom count, ring count,
+    SA, QED, and NPL.
 
     Input:
         smiles: SMILES string.
     Output:
-        float in [1, 10] (lower = easier) or None on failure.
+        dict with keys: valid, atom_count, ring_count, sa, qed, npl.
     """
+    result = {'valid': False, 'atom_count': None, 'ring_count': None,
+              'sa': None, 'qed': None, 'npl': None}
+    if not isinstance(smiles, str) or smiles == 'n.a.' or not smiles:
+        return result
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return None
+        return result
+    result['valid'] = True
+    result['atom_count'] = mol.GetNumAtoms()
+    result['ring_count'] = Descriptors.RingCount(mol)
     try:
-        return sascorer.calculateScore(mol)
-    except (ValueError, RuntimeError) as e:
-        print(f"  Warning: SA failed for {smiles[:30]}: {e}")
-        return None
-
-
-def calc_qed(smiles: str) -> Optional[float]:
-    """Compute quantitative estimate of drug-likeness.
-
-    Input:
-        smiles: SMILES string.
-    Output:
-        float in [0, 1] (higher = better) or None on failure.
-    """
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
+        result['sa'] = sascorer.calculateScore(mol)
+    except (ValueError, RuntimeError):
+        pass
     try:
-        return QED.qed(mol)
-    except (ValueError, RuntimeError) as e:
-        print(f"  Warning: QED failed for {smiles[:30]}: {e}")
-        return None
+        result['qed'] = QED.qed(mol)
+    except (ValueError, RuntimeError):
+        pass
+    if NP_MODEL is not None:
+        try:
+            result['npl'] = npscorer.scoreMol(mol, NP_MODEL)
+        except (ValueError, RuntimeError):
+            pass
+    return result
 
 
-def calc_npl(smiles: str) -> Optional[float]:
-    """Compute NP-likeness score.
-
-    Input:
-        smiles: SMILES string.
-    Output:
-        float in [-3, +3] (higher = more NP-like) or None on failure.
-    """
-    if NP_MODEL is None:
-        return None
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
-    try:
-        return npscorer.scoreMol(mol, NP_MODEL)
-    except (ValueError, RuntimeError) as e:
-        print(f"  Warning: NPL failed for {smiles[:30]}: {e}")
-        return None
-
-
-def smiles_to_fp(smiles: str, radius: int = 2, n_bits: int = 1024) -> Optional[np.ndarray]:
+def smiles_to_fp(smiles, radius=2, n_bits=1024):
     """Convert SMILES to Morgan fingerprint bit vector.
 
     Input:
@@ -171,18 +262,29 @@ def smiles_to_fp(smiles: str, radius: int = 2, n_bits: int = 1024) -> Optional[n
         arr = np.zeros((n_bits,), dtype=np.int8)
         DataStructs.ConvertToNumpyArray(fp, arr)
         return arr
-    except (ValueError, RuntimeError) as e:
-        print(f"  Warning: FP failed for {smiles[:30]}: {e}")
+    except (ValueError, RuntimeError):
         return None
 
 
-def apply_with_progress(series, func, desc):
-    """Apply func to each element with optional tqdm progress bar."""
-    results = []
-    iterator = tqdm(series, desc=desc) if HAS_TQDM else series
-    for val in iterator:
-        results.append(func(val))
-    return results
+def parallel_map(func, data, desc=""):
+    """Apply func in parallel with optional progress bar.
+
+    Input:
+        func: callable applied to each element.
+        data: list of values.
+        desc: tqdm description.
+    Output:
+        list of results.
+    """
+    n = N_JOBS if N_JOBS > 0 else cpu_count()
+    if n > 1:
+        with Pool(n) as pool:
+            if HAS_TQDM:
+                return list(tqdm(pool.imap(func, data), total=len(data), desc=desc))
+            return pool.map(func, data)
+    if HAS_TQDM:
+        return [func(x) for x in tqdm(data, desc=desc)]
+    return [func(x) for x in data]
 
 
 def detect_smiles_column(df):
@@ -247,55 +349,52 @@ def load_and_filter(input_path, smiles_col=None, sa_max=6.0,
             raise ValueError("SMILES column not found")
     print(f"  SMILES column: {smiles_col}")
 
-    print("Filtering valid SMILES...")
-    valid_mask = df[smiles_col].apply(
-        lambda x: pd.notna(x) and x != 'n.a.' and Chem.MolFromSmiles(str(x)) is not None
-    )
-    df = df[valid_mask].copy()
-    print(f"  {n_init:,} -> {len(df):,}")
+    # Single-pass parallel: compute all properties per molecule
+    print("Computing properties (single pass, parallel)...")
+    smiles_list = df[smiles_col].tolist()
+    props = parallel_map(compute_properties, smiles_list, desc="Properties")
 
-    print(f"Filtering atom count (<= {max_atoms})...")
-    df['atom_count'] = df[smiles_col].apply(
-        lambda x: Chem.MolFromSmiles(x).GetNumAtoms()
-    )
+    df['_valid'] = [p['valid'] for p in props]
+    df['atom_count'] = [p['atom_count'] for p in props]
+    df['ring_count'] = [p['ring_count'] for p in props]
+    df['sa_score(RDKit)'] = [p['sa'] for p in props]
+    df['qed(RDKit)'] = [p['qed'] for p in props]
+    if NP_MODEL:
+        df['npl_score(RDKit)'] = [p['npl'] for p in props]
+
+    # Filter
+    print("Filtering...")
+    df = df[df['_valid']].copy()
+    print(f"  Valid SMILES: {n_init:,} -> {len(df):,}")
+
     n_before = len(df)
     df = df[df['atom_count'] <= max_atoms].copy()
-    print(f"  {n_before:,} -> {len(df):,}")
+    print(f"  Atom count (<= {max_atoms}): {n_before:,} -> {len(df):,}")
 
-    print(f"Filtering ring count (<= {max_rings})...")
-    df['ring_count'] = df[smiles_col].apply(
-        lambda x: Descriptors.RingCount(Chem.MolFromSmiles(x))
-    )
     n_before = len(df)
     df = df[df['ring_count'] <= max_rings].copy()
-    print(f"  {n_before:,} -> {len(df):,}")
+    print(f"  Ring count (<= {max_rings}): {n_before:,} -> {len(df):,}")
 
-    print(f"Calculating SA score (filtering <= {sa_max})...")
-    df['sa_score(RDKit)'] = apply_with_progress(df[smiles_col].tolist(), calc_sa, "SA")
     n_before = len(df)
     df = df[df['sa_score(RDKit)'].notna() & (df['sa_score(RDKit)'] <= sa_max)].copy()
-    print(f"  {n_before:,} -> {len(df):,}")
+    print(f"  SA (<= {sa_max}): {n_before:,} -> {len(df):,}")
 
-    print("Calculating QED...")
-    df['qed(RDKit)'] = apply_with_progress(df[smiles_col].tolist(), calc_qed, "QED")
+    df.drop(columns=['_valid'], inplace=True)
 
-    print("Calculating NPL score...")
-    if NP_MODEL:
-        df['npl_score(RDKit)'] = apply_with_progress(df[smiles_col].tolist(), calc_npl, "NPL")
-    else:
+    if not NP_MODEL:
         print("  NPL model not available, skipping")
 
     print(f"Filtering done: {n_init:,} -> {len(df):,} ({100*len(df)/n_init:.1f}%)")
     return df, smiles_col
 
 
-def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7,
+def kmeans_subset(df, smiles_col, target_size=10000, seed=42, fp_weight=0.7,
                   fp_dim=3):
     """Select diverse subset via K-means in Tanimoto fingerprint space.
 
     Binary Morgan fingerprints are reduced to fp_dim dimensions via PCA,
     combined with molecular properties, then clustered with
-    MiniBatchKMeans (1.1x oversampling + smallest cluster pruning).
+    mini-batch K-means (closest-to-centroid selection).
 
     Input:
         df: filtered DataFrame with SMILES and computed properties.
@@ -316,16 +415,13 @@ def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7,
         return df
 
     print("  Computing fingerprints...")
-    fps, valid_idx = [], []
     smiles_list = df[smiles_col].tolist()
     indices = df.index.tolist()
-    iterator = (
-        tqdm(zip(indices, smiles_list), total=len(smiles_list), desc="FP")
-        if HAS_TQDM else zip(indices, smiles_list)
-    )
 
-    for idx, smi in iterator:
-        fp = smiles_to_fp(smi)
+    fp_results = parallel_map(smiles_to_fp, smiles_list, desc="FP")
+
+    fps, valid_idx = [], []
+    for idx, fp in zip(indices, fp_results):
         if fp is not None:
             fps.append(fp)
             valid_idx.append(idx)
@@ -357,6 +453,11 @@ def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7,
             return np.zeros_like(arr)
         return (arr - min_val) / (max_val - min_val)
 
+    # Normalize PCA dimensions to [0,1]
+    X_fp_norm = np.column_stack([normalize(X_fp_reduced[:, i])
+                                 for i in range(X_fp_reduced.shape[1])])
+    print(f"  FP dimensions normalized to [0,1]")
+
     sa_norm = normalize(sa_vals)
     qed_norm = normalize(qed_vals)
 
@@ -368,9 +469,9 @@ def kmeans_subset(df, smiles_col, target_size=100000, seed=42, fp_weight=0.7,
         X_props = np.column_stack([sa_norm, qed_norm])
         print("  Properties: SA, QED (normalized)")
 
-    # Combine reduced FP and properties with weighting
+    # Combine normalized FP and properties with weighting
     prop_weight = 1.0 - fp_weight
-    X_combined = np.hstack([X_fp_reduced * fp_weight, X_props * prop_weight])
+    X_combined = np.hstack([X_fp_norm * fp_weight, X_props * prop_weight])
     print(f"  Feature dim: {X_combined.shape[1]} "
           f"(FP={X_fp_reduced.shape[1]}, props={X_props.shape[1]})")
 
@@ -454,16 +555,22 @@ def main():
     parser.add_argument("-i", "--input", required=True, help="Input CSV")
     parser.add_argument("--sdf", help="Input SDF (optional)")
     parser.add_argument("-o", "--output", required=True, help="Output prefix")
-    parser.add_argument("-s", "--size", type=int, default=100000, help="Target size")
+    parser.add_argument("-s", "--size", type=int, default=10000, help="Target size")
     parser.add_argument("--sa_max", type=float, default=6.0, help="Max SA score")
     parser.add_argument("--max_atoms", type=int, default=150, help="Max atom count")
     parser.add_argument("--max_rings", type=int, default=10, help="Max ring count")
     parser.add_argument("--smiles_col", help="SMILES column (auto-detect if not set)")
     parser.add_argument("--fp_dim", type=int, default=3, help="PCA dims for Tanimoto space")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--n_jobs", type=int, default=-1,
+                        help="Parallel workers (-1 = all cores, 1 = single)")
     parser.add_argument("--classify", action="store_true",
                         help="Add ClassyFire superclass labels")
     args = parser.parse_args()
+
+    global N_JOBS
+    N_JOBS = args.n_jobs if args.n_jobs > 0 else cpu_count()
+    print(f"Workers: {N_JOBS}")
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)

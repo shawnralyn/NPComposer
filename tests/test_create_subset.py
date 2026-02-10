@@ -10,9 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from create_subset import (
     kmeans_select,
-    calc_sa,
-    calc_qed,
-    calc_npl,
+    compute_properties,
     smiles_to_fp,
     detect_smiles_column,
     detect_id_column,
@@ -47,38 +45,35 @@ class TestKmeansSelect:
         assert len(selected) == 10
 
 
-class TestCalcSA:
+class TestComputeProperties:
     def test_valid_smiles(self):
-        score = calc_sa("CCO")
-        assert score is not None
-        assert 1.0 <= score <= 10.0
+        result = compute_properties("CCO")
+        assert result['valid'] is True
+        assert result['atom_count'] > 0
+        assert result['ring_count'] == 0
+        assert result['sa'] is not None
+        assert 1.0 <= result['sa'] <= 10.0
+        assert result['qed'] is not None
+        assert 0.0 <= result['qed'] <= 1.0
 
     def test_invalid_smiles(self):
-        assert calc_sa("not_a_smiles") is None
+        result = compute_properties("not_a_smiles")
+        assert result['valid'] is False
 
     def test_empty_string(self):
-        assert calc_sa("") is None
+        result = compute_properties("")
+        assert result['valid'] is False
 
+    def test_aspirin(self):
+        result = compute_properties("CC(=O)Oc1ccccc1C(=O)O")
+        assert result['valid'] is True
+        assert result['ring_count'] == 1
+        assert result['qed'] is not None
 
-class TestCalcQED:
-    def test_valid_smiles(self):
-        score = calc_qed("CC(=O)Oc1ccccc1C(=O)O")  # aspirin
-        assert score is not None
-        assert 0.0 <= score <= 1.0
-
-    def test_invalid_smiles(self):
-        assert calc_qed("XXXXX") is None
-
-
-class TestCalcNPL:
-    def test_valid_smiles(self):
-        score = calc_npl("c1ccccc1")
-        # NP_MODEL may not be available
-        if score is not None:
-            assert -5.0 <= score <= 5.0
-
-    def test_invalid_smiles(self):
-        assert calc_npl("not_a_smiles") is None
+    def test_benzene_ring(self):
+        result = compute_properties("c1ccccc1")
+        assert result['valid'] is True
+        assert result['ring_count'] == 1
 
 
 class TestSmilesToFP:

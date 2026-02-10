@@ -20,12 +20,13 @@ SHELL := /bin/bash
 # Configurable variables (override via CLI: make subset-coconut SIZE=100000)
 PYTHON       ?= python3
 PIP          ?= pip
-SIZE         ?= 100000
+SIZE         ?= 10000
 SA_MAX       ?= 6.0
 MAX_ATOMS    ?= 150
 MAX_RINGS    ?= 10
 FP_DIM       ?= 3
 SEED         ?= 42
+N_JOBS       ?= -1
 CLASSIFY     ?= true
 TRAIN_RATIO  ?= 0.8
 VAL_RATIO    ?= 0.1
@@ -92,6 +93,7 @@ subset-coconut: ## Create COCONUT subset
 		--max_atoms $(MAX_ATOMS) \
 		--max_rings $(MAX_RINGS) \
 		--fp_dim $(FP_DIM) \
+		--n_jobs $(N_JOBS) \
 		--seed $(SEED) \
 		$(if $(filter true,$(CLASSIFY)),--classify,)
 
@@ -107,6 +109,7 @@ subset-npass: ## Create NPASS subset
 		--max_atoms $(MAX_ATOMS) \
 		--max_rings $(MAX_RINGS) \
 		--fp_dim $(FP_DIM) \
+		--n_jobs $(N_JOBS) \
 		--seed $(SEED) \
 		$(if $(filter true,$(CLASSIFY)),--classify,)
 

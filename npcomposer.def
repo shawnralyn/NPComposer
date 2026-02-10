@@ -111,7 +111,7 @@ From: continuumio/miniconda3:24.7.1-0
     echo "  apptainer exec npcomposer.sif make test"
 
 %test
-    echo "=== Verifying NPComposer container ==="
+    echo "Verifying NPComposer container"
 
     python --version
 
@@ -133,9 +133,9 @@ except Exception as e:
 "
 
     cd /app
-    python -c "from scripts.create_subset import calc_sa; print('create_subset OK')"
+    python -c "from scripts.create_subset import compute_properties; print('create_subset OK')"
     python -c "from scripts.split_data import split_data; print('split_data OK')"
 
     cd /app && python -m pytest tests/ -v --tb=short || true
 
-    echo "=== Container verification complete ==="
+    echo "Container verification complete"

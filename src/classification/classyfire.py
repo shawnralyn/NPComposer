@@ -1,7 +1,9 @@
 """ClassyFire superclass classification via REST API."""
 
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional
 
@@ -87,14 +89,43 @@ def _save_cache(cache: dict, path: str):
         pass
 
 
+def _classify_one(args):
+    """Classify a single SMILES (for thread pool).
+
+    Input:
+        args: tuple of (index, smiles, cache, lock).
+    Output:
+        tuple of (index, inchikey, label).
+    """
+    idx, smi, cache, lock = args
+    inchikey = smiles_to_inchikey(smi)
+    if inchikey is None:
+        return idx, None, "Unknown"
+
+    with lock:
+        if inchikey in cache:
+            return idx, inchikey, cache[inchikey]
+
+    label = query_entity(inchikey)
+    result = label if label else "Unknown"
+
+    with lock:
+        cache[inchikey] = result
+
+    return idx, inchikey, result
+
+
 def classify_batch(smiles_list: List[str], cache_dir: str = ".",
-                   delay: float = 0.2) -> List[str]:
+                   delay: float = 0.2, n_workers: int = 32) -> List[str]:
     """Classify SMILES into ClassyFire superclasses via InChIKey lookup.
+
+    Uses ThreadPoolExecutor for concurrent API requests.
 
     Input:
         smiles_list: list of SMILES strings.
         cache_dir: directory for classyfire_cache.json.
         delay: seconds between API calls (rate limiting).
+        n_workers: number of concurrent threads (default 32).
     Output:
         list of superclass names (same length as input).
         Returns "Unknown" for failed classifications.
@@ -105,37 +136,48 @@ def classify_batch(smiles_list: List[str], cache_dir: str = ".",
 
     cache_path = str(Path(cache_dir) / CACHE_FILENAME)
     cache = _load_cache(cache_path)
-    results = []
-    api_calls = 0
+    lock = threading.Lock()
+
+    # Separate cached vs uncached
+    results = ["Unknown"] * len(smiles_list)
+    to_query = []
     cached_hits = 0
 
-    iterator = enumerate(smiles_list)
-    if HAS_TQDM:
-        iterator = tqdm(list(iterator), desc="ClassyFire")
-
-    for i, smi in iterator:
+    for i, smi in enumerate(smiles_list):
         inchikey = smiles_to_inchikey(smi)
         if inchikey is None:
-            results.append("Unknown")
             continue
-
         if inchikey in cache:
-            results.append(cache[inchikey])
+            results[i] = cache[inchikey]
             cached_hits += 1
-            continue
+        else:
+            to_query.append((i, smi, cache, lock))
 
-        superclass = query_entity(inchikey)
-        label = superclass if superclass else "Unknown"
-        cache[inchikey] = label
-        results.append(label)
-        api_calls += 1
+    print(f"  Cache hits: {cached_hits:,}, to query: {len(to_query):,}")
 
-        if api_calls % 100 == 0:
-            _save_cache(cache, cache_path)
+    if to_query:
+        api_calls = 0
+        failed = 0
 
-        time.sleep(delay)
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futures = {pool.submit(_classify_one, args): args[0]
+                       for args in to_query}
+
+            iterator = as_completed(futures)
+            if HAS_TQDM:
+                iterator = tqdm(iterator, total=len(futures),
+                                desc="ClassyFire")
+
+            for future in iterator:
+                idx, inchikey, label = future.result()
+                results[idx] = label
+                if label != "Unknown":
+                    api_calls += 1
+                else:
+                    failed += 1
+
+        print(f"  ClassyFire: {api_calls:,} classified, "
+              f"{failed:,} failed, {cached_hits:,} cached")
 
     _save_cache(cache, cache_path)
-    print(f"  ClassyFire: {api_calls} API calls, {cached_hits} cache hits, "
-          f"{len(smiles_list) - api_calls - cached_hits} failed")
     return results

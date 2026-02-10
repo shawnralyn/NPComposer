@@ -51,6 +51,7 @@ python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
 | --max_atoms | 150 | Max atom count |
 | --max_rings | 10 | Max ring count |
 | --fp_dim | 3 | PCA dimensions for Tanimoto space |
+| --n_jobs | -1 | Parallel workers (-1 = all cores) |
 | --seed | 42 | Random seed |
 | --classify | false | Add ClassyFire superclass labels |
 
