@@ -1,11 +1,33 @@
 import torch
+import tqdm
+import evaluator 
 from datasets import load_dataset
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     TrainingArguments,
     Trainer,
+    wandb
 )
+
+# add to requirements.txt
+
+# think about beam search, DPO
+
+# load COCONUT dataset train/test/val
+
+# load GP-MolFormer-Uniq model and its tokenizer
+
+# create special class tokens based on NP pathway class
+
+# run tokenizer on all examples, pad, and apply attention mask
+
+# data collator?
+
+# create trainer arguments, instantiate trainer, and run
+
+# use evaluator/weights and biases library to plot learning curves (loss/accuracy)
+
 
 
 # 1) load GP-MoLFormer-Uniq model and its associated tokenizer
@@ -15,7 +37,7 @@ tokenizer = AutoTokenizer.from_pretrained("ibm-research/MoLFormer-XL-both-10pct"
 # 2) load COCONUT dataset
 train_data = 
 test_data = 
-
+val_data = 
 
 # create condtional "class tokens" vocabulary 
 # register those class toekns with the tokenizer
@@ -95,6 +117,7 @@ training_args = TrainingArguments(
     weight_decay=0.01,
     save_strategy="epoch",
     load_best_model_at_end=True,
+    fp=16 # used mixed precision for faster training
 )
 
 # instantiate trainer
