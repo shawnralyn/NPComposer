@@ -20,3 +20,11 @@ Makefile: Build automation (make all runs full pipeline)
 config.yaml: Hydra configuration defaults
 npcomposer.def: Apptainer container definition
 tests: pytest test suite
+
+## 5.Training components
+Training components:
+1. Model/tokenizer loader - methods for loading foundation model and associated tokenizer 
+2. Special character tokenizer - function that will read all values in select columns of database and create special tokens
+3. Tokenizer - Function that will tokenize SMILES data according to foundation model tokenizer
+4. Trainer - Function that will take training arguments and carry out fine-tuning of foundation model
+5. Evaluator 
