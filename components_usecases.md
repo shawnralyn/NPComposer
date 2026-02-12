@@ -8,7 +8,7 @@ merge_training.py: Merge COCONUT and NPASS subsets, deduplicate by SMILES, fill 
 classyfire.py: ClassyFire superclass classification via REST API 
 
 
-## 2.Analysis componen
+## 2.Analysis components
 analyze_distribution.py: Compare raw vs processed distributions (MW, SA, QED, NPL, superclass) & draw histogram for each features
 analyze_sdf.py: Inspect SDF file structure and 3D properties
 
@@ -23,8 +23,10 @@ tests: pytest test suite
 
 ## 5.Training components
 Training components:
-1. Model/tokenizer loader - methods for loading foundation model and associated tokenizer 
-2. Special character tokenizer - function that will read all values in select columns of database and create special tokens
-3. Tokenizer - Function that will tokenize SMILES data according to foundation model tokenizer
-4. Trainer - Function that will take training arguments and carry out fine-tuning of foundation model
-5. Evaluator 
+1. Pre-trained foundation model - Transformer model trained on 1.1B SMILES strings
+2. Foundation model tokenizer - Defines tokenization scheme and maps tokens to ID dictionary for conversion of SMILES information to numerical representation
+3. Model/tokenizer loader - methods for loading foundation model and associated tokenizer provided by transformers library
+4. Special character tokenizer - function that will read all values in select columns of database and create special tokens using tokenizer.add_special_tokens function
+5. Tokenizer - Function that will tokenize SMILES data according to foundation model tokenizer
+6. Trainer - Function that will take training arguments and carry out fine-tuning of foundation model
+7. Evaluator - Function that uses Evaluator/wandb library to track learning rates and creates plot per epoch

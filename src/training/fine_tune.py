@@ -31,6 +31,7 @@ from transformers import (
 
 
 # 1) load GP-MoLFormer-Uniq model and its associated tokenizer
+# wrap in try/except 
 model = AutoModelForCausalLM.from_pretrained("ibm-research/GP-MoLFormer-Uniq", trust_remote_code=True)
 tokenizer = AutoTokenizer.from_pretrained("ibm-research/MoLFormer-XL-both-10pct", trust_remote_code=True)
 
