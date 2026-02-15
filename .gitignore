@@ -21,6 +21,7 @@ env/
 data/raw/
 data/processed/
 data/splits/
+runs
 
 # Hydra outputs
 outputs/
@@ -48,3 +49,7 @@ multirun/
 *.pth
 *.ckpt
 checkpoints/
+
+# wandb
+src/training/checkpoint-200/
+src/training/wandb/

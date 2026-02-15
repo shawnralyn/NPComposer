@@ -147,6 +147,10 @@ def main():
         configs["base"]["model"], trust_remote_code=True
     )
 
+    total = sum(p.numel() for p in model.parameters())
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Trainable params: {trainable:,} / {total:,} ({100*trainable/total:.2f}%)")
+
     # load tokenizer associated with transformer model
     tokenizer = AutoTokenizer.from_pretrained(
         configs["base"]["tokenizer"], trust_remote_code=True
@@ -202,15 +206,15 @@ def main():
 
     # define arguments for training
     training_args = TrainingArguments(
-        learning_rate=configs["training"]["learning_rate"],
-        num_train_epochs=configs["training"]["num_train_epochs"],
-        weight_decay=configs["training"]["weight_decay"],
-        warmup_ratio=configs["training"]["warmup_ratio"],
-        per_device_train_batch_size=configs["training"]["per_device_train_batch_size"],
-        load_best_model_at_end=configs["training"]["load_best_model_at_end"],
+        learning_rate=float(configs["training"]["learning_rate"]),
+        num_train_epochs=float(configs["training"]["num_train_epochs"]),
+        weight_decay=float(configs["training"]["weight_decay"]),
+        warmup_ratio=float(configs["training"]["warmup_ratio"]),
+        per_device_train_batch_size=int(configs["training"]["per_device_train_batch_size"]),
+        per_device_eval_batch_size=int(configs["training"]["per_device_eval_batch_size"]),
+	load_best_model_at_end=bool(configs["training"]["load_best_model_at_end"]),
         output_dir=configs["training"]["output_dir"],
         fp16=True,  # enable mixed precision for faster training
-        max_steps=configs["training"]["max_steps"], # use for test run
 
         # W&B
         report_to=configs["training"]["report_to"],
@@ -219,10 +223,11 @@ def main():
         # Eval/save
         evaluation_strategy=configs["training"]["evaluation_strategy"],
         save_strategy=configs["training"]["save_strategy"],
-        metric_for_best_model=configs["training"]["metric_for_best_model"],
-        greater_is_better=configs["training"]["greater_is_better"],
-        logging_steps=configs["training"]["logging_steps"],
-        save_total_limit=configs["training"]["save_total_limit"],
+	save_safetensors=False,
+	metric_for_best_model=configs["training"]["metric_for_best_model"],
+        greater_is_better=bool(configs["training"]["greater_is_better"]),
+        logging_steps=int(configs["training"]["logging_steps"]),
+        save_total_limit=int(configs["training"]["save_total_limit"]),
     )
 
     # Trainer contains all necessary components of a training loop

@@ -10,20 +10,20 @@ base:
    max_token_length: 200
 
 training:
-   learning_rate: 5e-5
+   learning_rate: 5.0e-5
    num_train_epochs: 3
    weight_decay: 0.01
-   per_device_train_batch_size: 4
+   per_device_train_batch_size: 8
+   per_device_eval_batch_size: 8
    warmup_ratio: 0.03
    evaluation_strategy: "epoch"
    save_strategy: "epoch"
    load_best_model_at_end: True
-   output_dir: "."
+   output_dir: "/workspace/NPComposer/runs/npcomposer_run1"
    report_to: ["wandb"]
    run_name: "npcomposer_run1"
    metric_for_best_model: "eval_loss"
    greater_is_better: False
    logging_steps: 500
    save_total_limit: 2
-   max_steps: 200
      
