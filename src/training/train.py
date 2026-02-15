@@ -2,7 +2,6 @@ import os
 import argparse
 import yaml
 import pandas as pd
-import wandb
 from typing import Any, Dict
 from datasets import Dataset
 from transformers import (
@@ -19,7 +18,7 @@ def parse_yaml(yml):
     Read in yaml configuration file
     """
     try:
-        with open(yml, 'r') as file:
+        with open(yml, "r") as file:
             configs = yaml.safe_load(file)
             return configs
     except FileNotFoundError:
@@ -45,7 +44,7 @@ def build_special_class_tokens(ds_train, class_col):
     train_df = pd.read_csv(ds_train)
     classes = sorted(set(train_df[class_col]))
     special_tokens = [f"<NP:{c}>" for c in classes]
-    
+
     # make dict for passing to tokenizer
     special_tokens_dict = {"additional_special_tokens": special_tokens}
 
@@ -57,7 +56,7 @@ def update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict):
     Updates tokenizer vocabulary with special tokens and resizes model embedding matrix to match tokenizer
     vocabulary size
 
-    inputs: 
+    inputs:
         -model: Loaded transformer model to be fine-tuned
         -tokenizer: Tokenizer associated with transformer model
         -special_tokens_dict (dict): Dictionary formatted to add special class tokens to tokenizer vocabulary
@@ -89,17 +88,25 @@ def dataframe_to_tokenized_dataset(
     that contains tokenized fields ready for training.
     """
     if smiles_col not in df.columns:
-        raise KeyError(f"smiles_col '{smiles_col}' not found in df columns: {list(df.columns)}")
+        raise KeyError(
+            f"smiles_col '{smiles_col}' not found in df columns: {list(df.columns)}"
+        )
     if class_col not in df.columns:
-        raise KeyError(f"class_col '{class_col}' not found in df columns: {list(df.columns)}")
+        raise KeyError(
+            f"class_col '{class_col}' not found in df columns: {list(df.columns)}"
+        )
 
     df = df.dropna(subset=[smiles_col, class_col]).copy()
-    df[class_col] = df[class_col].astype(str) # ensure entries are strings
+    df[class_col] = df[class_col].astype(str)  # ensure entries are strings
 
     # Create string for training per row in df
-    df["train_text"] = ("<NP:" + df[class_col] + ">") + df[smiles_col].astype(str)
+    df["train_text"] = (
+        ("<NP:" + df[class_col] + ">")
+        + df[smiles_col].astype(str)
+        + (tokenizer.eos_token or "")
+    )
 
-    # create Dataset from df using only the text column containing formatted examples (i.e. "<np class>+SMILES") 
+    # create Dataset from df using only the text column containing formatted examples (i.e. "<np class>+SMILES")
     ds = Dataset.from_pandas(df[["train_text"]], preserve_index=False)
 
     def _tokenize_batch(batch: Dict[str, Any]) -> Dict[str, Any]:
@@ -111,7 +118,7 @@ def dataframe_to_tokenized_dataset(
             add_special_tokens=False,
             truncation=True,
             max_length=max_len,
-            padding=False, # pad using data collator
+            padding=False,  # pad using data collator
             return_attention_mask=True,
         )
 
@@ -136,13 +143,21 @@ def main():
     os.environ["WANDB_LOG_MODEL"] = configs["wandb"]["wandb_log_model"]
 
     # load transformer model for fine-tuning
-    model = AutoModelForCausalLM.from_pretrained(configs['base']['model'], trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        configs["base"]["model"], trust_remote_code=True
+    )
 
     # load tokenizer associated with transformer model
-    tokenizer = AutoTokenizer.from_pretrained(configs['base']['tokenizer'], trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        configs["base"]["tokenizer"], trust_remote_code=True
+    )
 
-    special_tokens_dict = build_special_class_tokens(args.train_csv, configs['base']['class_col'])
-    model, tokenizer = update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict)
+    special_tokens_dict = build_special_class_tokens(
+        args.train_csv, configs["base"]["class_col"]
+    )
+    model, tokenizer = update_tokenizer_with_special_tokens(
+        model, tokenizer, special_tokens_dict
+    )
 
     # load csvs into pandas df
     train_df = pd.read_csv(args.train_csv)
@@ -180,34 +195,42 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # data collator takes variable-length tokenized examples and pads them to the same length to produce rectangular tensor 
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False) # set mlm (masked language model) = False for causal LM
+    # data collator takes variable-length tokenized examples and pads them to the same length to produce rectangular tensor
+    data_collator = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer, mlm=False
+    )  # set mlm (masked language model) = False for causal LM
 
     # define arguments for training
     training_args = TrainingArguments(
         learning_rate=configs["training"]["learning_rate"],
         num_train_epochs=configs["training"]["num_train_epochs"],
         weight_decay=configs["training"]["weight_decay"],
+        warmup_ratio=configs["training"]["warmup_ratio"],
         per_device_train_batch_size=configs["training"]["per_device_train_batch_size"],
-        save_strategy=configs["training"]["save_strategy"],
         load_best_model_at_end=configs["training"]["load_best_model_at_end"],
         output_dir=configs["training"]["output_dir"],
-        fp16=True, # enable mixed precision for faster training
+        fp16=True,  # enable mixed precision for faster training
+        max_steps=configs["training"]["max_steps"], # use for test run
 
         # W&B
         report_to=configs["training"]["report_to"],
         run_name=configs["training"]["run_name"],
 
         # Eval/save
-        evaluation_strategy=configs["training"]["evaluation_strategy"]
-        # save_strategy
-        # metric_for_best_model
-        # logging_steps
-        # save_total_limit
-
+        evaluation_strategy=configs["training"]["evaluation_strategy"],
+        save_strategy=configs["training"]["save_strategy"],
+        metric_for_best_model=configs["training"]["metric_for_best_model"],
+        greater_is_better=configs["training"]["greater_is_better"],
+        logging_steps=configs["training"]["logging_steps"],
+        save_total_limit=configs["training"]["save_total_limit"],
     )
 
-    trainer = Trainer(
+    # Trainer contains all necessary components of a training loop
+    # 1. Calculates loss from a training step
+    # 2. Calculates the gradients 
+    # 3. Update the model weights based on gradients
+    # 4. Repeat for predetermined number of epochs
+    trainer = Trainer(  # Trainer will automatically use GPU if available (device does not have to be manually specified)
         model=model,
         tokenizer=tokenizer,
         args=training_args,
@@ -216,8 +239,8 @@ def main():
         data_collator=data_collator,
     )
 
-    trainer.train() # starts training
-    trainer.save_model() # save model so you can reload it using "from_pretrained()"
+    trainer.train()  # starts training
+    trainer.save_model()  # save model so you can reload it using "from_pretrained()"
 
 
 if __name__ == "__main__":
