@@ -1,19 +1,18 @@
-import pandas as pd
+import os
 import argparse
 import yaml
-#from datasets import Dataset
-#import tqdm
-from transformers import (
-AutoModelForCausalLM, AutoTokenizer,
-DataCollatorForLanguageModeling,
-Trainer, TrainingArguments,
-#     wandb, Evaluator
-)
+import pandas as pd
+import wandb
 from typing import Any, Dict
 from datasets import Dataset
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    DataCollatorForLanguageModeling,
+    Trainer,
+    TrainingArguments,
+)
 
-# drop molecules longer than 200 tokens 
-# track which files used for training
 
 def parse_yaml(yml):
     """
@@ -132,6 +131,10 @@ def main():
 
     configs = parse_yaml(args.yaml)
 
+    # wandb environement variables
+    os.environ["WANDB_PROJECT"] = configs["wandb"]["wandb_project"]
+    os.environ["WANDB_LOG_MODEL"] = configs["wandb"]["wandb_log_model"]
+
     # load transformer model for fine-tuning
     model = AutoModelForCausalLM.from_pretrained(configs['base']['model'], trust_remote_code=True)
 
@@ -188,8 +191,20 @@ def main():
         per_device_train_batch_size=configs["training"]["per_device_train_batch_size"],
         save_strategy=configs["training"]["save_strategy"],
         load_best_model_at_end=configs["training"]["load_best_model_at_end"],
-        output_dir=configs["training"]["output_dir"]
+        output_dir=configs["training"]["output_dir"],
         fp16=True, # enable mixed precision for faster training
+
+        # W&B
+        report_to=configs["training"]["report_to"],
+        run_name=configs["training"]["run_name"],
+
+        # Eval/save
+        evaluation_strategy=configs["training"]["evaluation_strategy"]
+        # save_strategy
+        # metric_for_best_model
+        # logging_steps
+        # save_total_limit
+
     )
 
     trainer = Trainer(
@@ -202,11 +217,8 @@ def main():
     )
 
     trainer.train() # starts training
-
-    metrics = trainer.evaluate()
-
-    trainer.save_metrics("eval", metrics) # save metrics in json file
     trainer.save_model() # save model so you can reload it using "from_pretrained()"
+
 
 if __name__ == "__main__":
     main()

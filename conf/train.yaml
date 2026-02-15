@@ -1,3 +1,7 @@
+wandb:
+   wandb_project: "npcomposer"
+   wandb_log_model: "checkpoint"
+
 base:
    model: "ibm-research/GP-MoLFormer-Uniq"
    tokenizer: "ibm-research/MoLFormer-XL-both-10pct"
@@ -13,4 +17,6 @@ training_args:
    save_strategy: "epoch"
    load_best_model_at_end: True
    output_dir: "."
+   report_to: "wandb"
+   run_name: "npcomposer_run1"
      
