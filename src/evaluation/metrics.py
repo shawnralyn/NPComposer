@@ -45,14 +45,17 @@ def evaluate(smiles_list: List[str], classify: bool = False) -> Dict:
 
     for s in smiles_list:
         mol = Chem.MolFromSmiles(s)
-        if mol is None:
+        if mol is None or mol.GetNumAtoms() == 0:
             continue
         valid += 1
         valid_smiles.append(s)
         sa.append(sascorer.calculateScore(mol))
         qed_scores.append(QED.qed(mol))
         if NP_MODEL:
-            np_scores.append(npscorer.scoreMol(mol, NP_MODEL))
+            try:
+                np_scores.append(npscorer.scoreMol(mol, NP_MODEL))
+            except (ValueError, ZeroDivisionError):
+                pass
 
     n = len(smiles_list)
 
