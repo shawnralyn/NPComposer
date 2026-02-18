@@ -23,6 +23,7 @@ tests: pytest test suite
 
 ## 5.Training components
 Training components:
+Specify inputs and outputs and side effects
 1. Pre-trained foundation model - Transformer model trained on 1.1B SMILES strings
 2. Foundation model tokenizer - Defines tokenization scheme and maps tokens to ID dictionary for conversion of SMILES information to numerical representation
 3. Model/tokenizer loader - methods for loading foundation model and associated tokenizer provided by transformers library
