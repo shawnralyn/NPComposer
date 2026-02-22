@@ -138,7 +138,7 @@ def main():
 
     configs = parse_yaml(args.yaml)
 
-    # wandb environement variables
+    # wandb environment variables
     os.environ["WANDB_PROJECT"] = configs["wandb"]["wandb_project"]
     os.environ["WANDB_LOG_MODEL"] = configs["wandb"]["wandb_log_model"]
 
@@ -214,7 +214,7 @@ def main():
         per_device_eval_batch_size=int(configs["training"]["per_device_eval_batch_size"]),
 	load_best_model_at_end=bool(configs["training"]["load_best_model_at_end"]),
         output_dir=configs["training"]["output_dir"],
-        fp16=True,  # enable mixed precision for faster training
+        fp16=False,  # enable mixed precision for faster training
 
         # W&B
         report_to=configs["training"]["report_to"],

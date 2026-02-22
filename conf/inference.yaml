@@ -1,7 +1,7 @@
 inference:
   num_molecules: 100
-  ckpt_path: "" # add path to checkpoint
-  output_file: "" # add path to output .txt file for getting metrics
+  ckpt_path: "/Users/sr/Documents/Downloads/np_composer_run2/checkpoint_196590"
+  output_file: "/Users/sr/Documents/NPComposer/data/fatty_acids_generation.txt"
   top_p: 0.95
   temperature: 1.0
-  np_class: "<NP:Polyketides>" # format with <NP:[class]>
+  np_class: "<NP:Fatty acids>" # format with <NP:[class]>

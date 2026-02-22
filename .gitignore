@@ -21,6 +21,7 @@ env/
 data/raw/
 data/processed/
 data/splits/
+data/outputs/
 runs
 
 # Hydra outputs
@@ -53,3 +54,6 @@ checkpoints/
 # wandb
 src/training/checkpoint-200/
 src/training/wandb/
+
+# files
+V2.txt
