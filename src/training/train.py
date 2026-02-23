@@ -82,6 +82,7 @@ def dataframe_to_tokenized_dataset(
     smiles_col: str,
     class_col: str,
     max_len: int,
+    filter_len: int = 200,
 ) -> Dataset:
     """
     Convert a pandas DataFrame with SMILES + class into a Hugging Face Dataset
@@ -105,6 +106,12 @@ def dataframe_to_tokenized_dataset(
         + df[smiles_col].astype(str)
         + (tokenizer.eos_token or "")
     )
+
+    # Filter out rows where tokenized length exceeds filter_len
+    df["tokenized_len"] = df["train_text"].apply(
+        lambda x: len(tokenizer(x, add_special_tokens=False)["input_ids"])
+    )
+    df = df[df["tokenized_len"] < filter_len].copy()
 
     # create Dataset from df using only the text column containing formatted examples (i.e. "<np class>+SMILES")
     ds = Dataset.from_pandas(df[["train_text"]], preserve_index=False)

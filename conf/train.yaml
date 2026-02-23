@@ -7,6 +7,7 @@ base:
    tokenizer: "ibm-research/MoLFormer-XL-both-10pct"
    smiles_col: "canonical_smiles"
    class_col: "np_classifier_pathway"
+   subclass_col: "np_classifier_superclass"
    max_token_length: 200
 
 training:
