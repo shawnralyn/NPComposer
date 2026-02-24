@@ -39,13 +39,13 @@ try:
 except ImportError:
     HAS_TQDM = False
 
-# ClassyFire classification (optional)
+# NPClassifier classification (local server preferred)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src" / "classification"))
 try:
-    from classyfire import classify_batch
-    HAS_CLASSYFIRE = True
+    from npclassifier import classify_batch
+    HAS_NPCLASSIFIER = True
 except ImportError:
-    HAS_CLASSYFIRE = False
+    HAS_NPCLASSIFIER = False
 
 
 def _torch_nearest(X, centers, data_chunk=4096, center_chunk=20000):
@@ -565,7 +565,10 @@ def main():
     parser.add_argument("--n_jobs", type=int, default=-1,
                         help="Parallel workers (-1 = all cores, 1 = single)")
     parser.add_argument("--classify", action="store_true",
-                        help="Add ClassyFire superclass labels")
+                        help="Add NPClassifier superclass labels (local model)")
+    parser.add_argument("--np_root",
+                        default=os.environ.get("NP_CLASSIFIER_ROOT"),
+                        help="Path to NP-Classifier repo clone (or set NP_CLASSIFIER_ROOT env)")
     args = parser.parse_args()
 
     global N_JOBS
@@ -580,17 +583,20 @@ def main():
     )
     subset = kmeans_subset(df, smiles_col, args.size, args.seed, fp_dim=args.fp_dim)
 
-    # ClassyFire superclass classification
+    # NPClassifier superclass classification (pure local inference)
     if args.classify:
-        if HAS_CLASSYFIRE:
-            print("Classifying superclass (ClassyFire API)...")
+        if HAS_NPCLASSIFIER:
+            print("Classifying superclass (NPClassifier local model)...")
             cache_dir = str(out_path.parent)
             superclasses = classify_batch(
-                subset[smiles_col].tolist(), cache_dir=cache_dir
+                subset[smiles_col].tolist(),
+                cache_dir=cache_dir,
+                repo_root=args.np_root,
+                level="superclass",
             )
             subset['superclass'] = superclasses
         else:
-            print("Warning: ClassyFire not available (install 'requests')")
+            print("Warning: NPClassifier not available (check src/classification/npclassifier.py)")
 
     csv_path = f"{args.output}.csv"
     id_col = save_subset(subset, csv_path, smiles_col)

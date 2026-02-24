@@ -17,10 +17,10 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src" / "classification"))
 try:
-    from classyfire import classify_batch
-    HAS_CLASSYFIRE = True
+    from npclassifier import classify_batch
+    HAS_NPCLASSIFIER = True
 except ImportError:
-    HAS_CLASSYFIRE = False
+    HAS_NPCLASSIFIER = False
 
 
 SMILES_CANDIDATES = [
@@ -92,11 +92,11 @@ def fill_superclass(df, cache_dir="."):
     """Ensure every row has a superclass label.
 
     Priority: superclass > np_classifier_superclass > chemical_super_class.
-    Remaining NaN values are filled via ClassyFire API.
+    Remaining NaN values are filled via NPClassifier (local server).
 
     Input:
         df: merged DataFrame with 'smiles' column.
-        cache_dir: directory for ClassyFire cache file.
+        cache_dir: directory for NPClassifier cache file.
     Output:
         pandas DataFrame with 'superclass' column filled.
     """
@@ -114,14 +114,14 @@ def fill_superclass(df, cache_dir="."):
     n_missing = missing.sum()
     print(f"Superclass: {len(df) - n_missing:,} filled, {n_missing:,} missing")
 
-    if n_missing > 0 and HAS_CLASSYFIRE:
-        print(f"Classifying {n_missing:,} molecules via ClassyFire API...")
+    if n_missing > 0 and HAS_NPCLASSIFIER:
+        print(f"Classifying {n_missing:,} molecules via NPClassifier (local)...")
         missing_smiles = df.loc[missing, "smiles"].tolist()
-        labels = classify_batch(missing_smiles, cache_dir=cache_dir)
+        labels = classify_batch(missing_smiles, cache_dir=cache_dir, level="superclass")
         df.loc[missing, "superclass"] = labels
 
     elif n_missing > 0:
-        print("Warning: ClassyFire not available, filling with 'Unknown'")
+        print("Warning: NPClassifier not available, filling with 'Unknown'")
         df.loc[missing, "superclass"] = "Unknown"
 
     return df
