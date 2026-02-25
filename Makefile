@@ -43,6 +43,7 @@ COCONUT_CSV := $(DATA_RAW)/coconut_csv_full.csv
 COCONUT_SDF := $(DATA_RAW)/coconut_sdf_3d_full.sdf
 NPASS_MERGED := $(DATA_RAW)/npass_full.csv
 TRAINING_DATA := $(DATA_PROCESSED)/training_data.csv
+NP_DRUG_DATA := $(DATA_PROCESSED)/np_drug.csv
 
 # Apptainer
 SIF_NAME     ?= npcomposer.sif
@@ -68,8 +69,12 @@ download-coconut: ## Download COCONUT dataset (~500 MB)
 download-npass: ## Download NPASS 3.0 dataset
 	bash scripts/download_npass.sh
 
+.PHONY: download-np_drug
+download-np_drug: ## Download np drug dataset (~60 MB)
+	bash scripts/download_np_drug.sh
+
 .PHONY: download-all
-download-all: download-coconut download-npass ## Download all datasets
+download-all: download-coconut download-npass download-np_drug ## Download all datasets
 
 # NPASS Merge
 
@@ -123,6 +128,15 @@ merge-training: ## Merge COCONUT + NPASS subsets into training_data.csv
 		--coconut $(DATA_PROCESSED)/coconut_$(SIZE).csv \
 		--npass $(DATA_PROCESSED)/npass_$(SIZE).csv \
 		-o $(TRAINING_DATA)
+
+# Create Drug Discovery Dataset
+
+.PHONY: create-drug-dataset
+create-drug-dataset: ## refine np drug dataset into np_drug.csv
+	@test -f $(DATA_RAW)/np_drug.xlsx || { echo "Error: np drug dataset not found. Run 'make download-np_drug' first."; exit 1; }
+	$(PYTHON) scripts/clean_npdrug.py \
+		-i $(DATA_RAW)/np_drug.xlsx \
+		-o $(NP_DRUG_DATA)
 
 # Train / Val / Test Split
 
@@ -194,8 +208,11 @@ pipeline-coconut: subset-coconut split-coconut ## Full COCONUT pipeline: subset 
 .PHONY: pipeline-npass
 pipeline-npass: merge-npass subset-npass split-npass ## Full NPASS pipeline: merge -> subset -> split
 
+.PHONY: pipeline-np_drug
+pipeline-np_drug: create-drug-dataset ## Full COCONUT pipeline: subset -> split
+
 .PHONY: pipeline-all
-pipeline-all: pipeline-coconut pipeline-npass merge-training analyze-dist ## Run both pipelines + merge + analyze
+pipeline-all: pipeline-coconut pipeline-npass pipeline-np_drug merge-training analyze-dist ## Run both pipelines + merge + analyze
 
 # One-shot targets (setup + download + pipeline)
 

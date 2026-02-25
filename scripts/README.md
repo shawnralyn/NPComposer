@@ -107,3 +107,11 @@ Analyze SDF file structure and molecular properties.
 ```bash
 python scripts/analyze_sdf.py -i data/raw/coconut_sdf_3d_full.sdf -n 5000
 ```
+
+## clean_npdrug.py
+
+Clean and process NP-Drug Excel file into a structured CSV.
+
+```bash
+python scripts/clean_npdrug.py -i data/raw/np_drug.xlsx -o data/processed/np_drug.csv
+```
