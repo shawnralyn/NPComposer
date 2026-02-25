@@ -26,7 +26,8 @@ NPComposer/
 │   └── analyze_sdf.py          # Analyze SDF structure
 ├── src/
 │   ├── classification/
-│   │   └── classyfire.py       # ClassyFire superclass API
+│   │   ├── npclassifier.py     # NPClassifier local inference
+│   │   └── classyfire.py       # ClassyFire API (deprecated)
 │   └── evaluation/
 │       └── metrics.py          # Evaluation metrics
 ├── tests/                      # pytest test suite
@@ -37,19 +38,17 @@ NPComposer/
 
 ## Quick Start
 
-`make all` runs the entire pipeline from setup to testing in one command. This is the recommended way to run NPComposer.
-
 ```bash
 make all
 ```
 
-This executes: setup -> download -> subset -> split -> merge -> test.
+Runs: setup -> download -> subset -> split -> merge -> test.
 
 For individual datasets:
 
 ```bash
-make all-coconut    # COCONUT only
-make all-npass      # NPASS only
+make all-coconut
+make all-npass
 ```
 
 To override defaults:
@@ -58,15 +57,48 @@ To override defaults:
 make subset-coconut SIZE=100000 SA_MAX=5.0 SEED=42
 ```
 
-To see all available targets:
+## NPClassifier Setup
+
+NPClassifier runs locally (no server, no network). One-time setup:
 
 ```bash
-make help
+git clone https://github.com/mwang87/NP-Classifier
+cd NP-Classifier/Classifier/models_folder/models
+wget -O models.zip "https://zenodo.org/record/5068687/files/model.zip?download=1"
+unzip models.zip
+```
+
+Set the environment variable:
+
+```bash
+export NP_CLASSIFIER_ROOT=/path/to/NP-Classifier
+```
+
+Or pass `--np_root` to scripts directly.
+
+### NPClassifier in the Pipeline
+
+Classification is enabled by default (`CLASSIFY=true`). Set `NP_CLASSIFIER_ROOT` before running:
+
+```bash
+export NP_CLASSIFIER_ROOT=~/NP-Classifier
+make all
+```
+
+To skip classification:
+
+```bash
+make all CLASSIFY=false
+```
+
+### Standalone Evaluation with Classification
+
+```bash
+python src/evaluation/metrics.py -i generated.txt -o results.json \
+    --classify --np_root ~/NP-Classifier
 ```
 
 ## Setup
-
-For manual setup without `make all`:
 
 ```bash
 make setup
@@ -74,13 +106,15 @@ make setup
 pip install -r requirements.txt
 ```
 
+Requires `tensorflow` for NPClassifier local inference (already in requirements.txt).
+
 ## Test
 
 ```bash
 make test
 ```
 
-Runs `pytest tests/ -v`. To skip slow tests:
+Skip slow tests:
 
 ```bash
 make test-quick
@@ -130,7 +164,7 @@ Raw Data (COCONUT 715K / NPASS 203K)
     ↓ SA filter (<= 6.0)
     ↓ Tanimoto space embedding (FP → PCA 3D)
     ↓ K-means clustering (Tanimoto FP + SA/QED/NPL)
-    ↓ ClassyFire superclass labeling
+    ↓ NPClassifier superclass labeling (local)
 Subset (100K each) → Merge → training_data.csv → Train/Val/Test (seed=42)
     ↓ Distribution analysis (raw vs processed histograms + stats)
 ```
@@ -150,3 +184,27 @@ All defaults are managed via `conf/config.yaml` (Hydra). Override from CLI:
 ```bash
 python scripts/create_subset.py filtering.sa_max=5.0 subset.size=100000
 ```
+
+## Citation
+
+This project uses [NP-Classifier](https://github.com/mwang87/NP-Classifier) for natural product classification. If you use NPComposer, please cite:
+
+```bibtex
+@article{kim2021npclassifier,
+  title={NPClassifier: A Deep Neural Network-Based Structural Classification Tool for Natural Products},
+  author={Kim, Hyun Woo and Wang, Mingxun and Leber, Christopher A and Nothias, Louis-F{\'e}lix and Reher, Raphael and Kang, Kyo Bin and van der Hooft, Justin JJ and Dorrestein, Pieter C and Gerwick, William H and Cottrell, Garrison W},
+  journal={Journal of Natural Products},
+  volume={84},
+  number={11},
+  pages={2795--2807},
+  year={2021},
+  publisher={ACS Publications},
+  doi={10.1021/acs.jnatprod.1c00399}
+}
+```
+
+## Third-Party Licenses
+
+This project uses code adapted from
+[NP-Classifier](https://github.com/mwang87/NP-Classifier) (MIT License).
+See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for full details.

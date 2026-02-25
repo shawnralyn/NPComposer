@@ -56,6 +56,8 @@ evaluation:
     - sa_score
     - qed
     - np_score
+  classify: true
+  np_classifier_root: ${oc.env:NP_CLASSIFIER_ROOT,""}
 
 # NPASS Merge Settings
 npass_merge:

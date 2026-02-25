@@ -105,7 +105,7 @@ Added columns (RDKit):
 | sa_score(RDKit) | Synthetic accessibility (1-10) |
 | qed(RDKit) | Drug-likeness (0-1) |
 | npl_score(RDKit) | NP-likeness (-3~+3) |
-| superclass | ClassyFire superclass (with --classify) |
+| superclass | NPClassifier superclass (with --classify) |
 | source | Dataset origin: coconut or npass (training_data.csv only) |
 
 ## splits/
