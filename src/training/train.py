@@ -2,12 +2,14 @@ import os
 import argparse
 import yaml
 import pandas as pd
+import random
 from typing import Any, Dict
+import torch
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    DataCollatorForLanguageModeling,
+    DataCollatorWithPadding,
     Trainer,
     TrainingArguments,
 )
@@ -27,34 +29,52 @@ def parse_yaml(yml):
         print(f"Error parsing YAML file: {exc}")
 
 
-def build_special_class_tokens(ds_train, class_col):
+def build_special_class_tokens(
+    ds_train,
+    pathway_col,
+    superclass_col,
+    is_glycoside_col,
+    num_aromatic_rings_col,
+    qed_bin_col,
+    sa_bin_col
+):
     """
-    Creates special class tokens for each value in class_col and returns dictionary to update tokenizer vocabulary
+    Creates special class tokens for each value in each class column and returns dictionary to update tokenizer vocabulary
 
     inputs:
-        -ds_train: csv path of COCONUT database (train split)
-        -class_col: column name specifying natural product class (i.e. "np_classifier_pathway")
+        - ds_train: csv path of COCONUT database (train split)
+        - pathway_col, superclass_col, ...: column names specifying natural product classes
 
     outputs:
-        -special_tokens (dict): Dict containing special tokens specifying natural product class to add to tokenizer
+        - special_tokens_dict (dict): Dict containing special tokens specifying natural product class to add to tokenizer
 
     additional:
-        -special tokens are added (rather than tokens) so that they won't be split during tokenization
+        - special tokens are added so that they won't be split during tokenization
     """
     train_df = pd.read_csv(ds_train)
-    classes = sorted(set(train_df[class_col]))
-    special_tokens = [f"<NP:{c}>" for c in classes]
+    special_tokens = set()
+    for class_col in [
+        pathway_col,
+        superclass_col,
+        is_glycoside_col,
+        num_aromatic_rings_col,
+        qed_bin_col,
+        sa_bin_col,
+    ]:
+        classes = sorted(set(train_df[class_col].astype(str)))
+        for c in classes:
+            special_tokens.add(f"<{class_col}:{c}>")
 
     # make dict for passing to tokenizer
-    special_tokens_dict = {"additional_special_tokens": special_tokens}
+    special_tokens_dict = {"additional_special_tokens": sorted(special_tokens)}
 
     return special_tokens_dict
 
 
 def update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict):
     """
-    Updates tokenizer vocabulary with special tokens and resizes model embedding matrix to match tokenizer
-    vocabulary size
+    Updates tokenizer vocabulary with special tokens and resizes model embedding matrix to match tokenizer vocabulary
+    size
 
     inputs:
         -model: Loaded transformer model to be fine-tuned
@@ -62,7 +82,8 @@ def update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict):
         -special_tokens_dict (dict): Dictionary formatted to add special class tokens to tokenizer vocabulary
 
     outputs:
-        -model: Transformer model with resized embedding matrix to match tokenizer vocabulary size after addition of special tokens
+        -model: Transformer model with resized embedding matrix to match tokenizer vocabulary size after addition of
+        special tokens
         -tokenizer: Tokenizer with updated vocabulary including special tokens
     """
 
@@ -80,31 +101,41 @@ def dataframe_to_tokenized_dataset(
     df: pd.DataFrame,
     tokenizer,
     smiles_col: str,
-    class_col: str,
+    pathway_col: str,
+    superclass_col: str,
+    is_glycoside_col: str,
+    num_aromatic_rings_col: str,
+    qed_bin_col: str,
+    sa_bin_col: str,
     max_len: int,
     filter_len: int = 200,
 ) -> Dataset:
     """
-    Convert a pandas DataFrame with SMILES + class into a Hugging Face Dataset
+    Convert a pandas DataFrame with SMILES + class columns into a Hugging Face Dataset
     that contains tokenized fields ready for training.
     """
-    if smiles_col not in df.columns:
-        raise KeyError(
-            f"smiles_col '{smiles_col}' not found in df columns: {list(df.columns)}"
-        )
-    if class_col not in df.columns:
-        raise KeyError(
-            f"class_col '{class_col}' not found in df columns: {list(df.columns)}"
-        )
+    # Ensure all columns exist
+    for col in [smiles_col, pathway_col, superclass_col, is_glycoside_col, num_aromatic_rings_col, qed_bin_col, sa_bin_col]:
+        if col not in df.columns:
+            raise KeyError(f"Column '{col}' not found in df columns: {list(df.columns)}")
 
-    df = df.dropna(subset=[smiles_col, class_col]).copy()
-    df[class_col] = df[class_col].astype(str)  # ensure entries are strings
+    # Drop rows with missing values in any required column
+    df = df.dropna(subset=[smiles_col, pathway_col, superclass_col, is_glycoside_col, num_aromatic_rings_col, qed_bin_col, sa_bin_col]).copy()
+
+    # Ensure all class columns are strings
+    for col in [pathway_col, superclass_col, is_glycoside_col, num_aromatic_rings_col, qed_bin_col, sa_bin_col]:
+        df[col] = df[col].astype(str)
 
     # Create string for training per row in df
     df["train_text"] = (
-        ("<NP:" + df[class_col] + ">")
-        + df[smiles_col].astype(str)
-        + (tokenizer.eos_token or "")
+        "<" + pathway_col + ":" + df[pathway_col] + "> " +
+        "<" + superclass_col + ":" + df[superclass_col] + "> " +
+        "<" + is_glycoside_col + ":" + df[is_glycoside_col] + "> " +
+        "<" + num_aromatic_rings_col + ":" + df[num_aromatic_rings_col] + "> " +
+        "<" + qed_bin_col + ":" + df[qed_bin_col] + "> " +
+        "<" + sa_bin_col + ":" + df[sa_bin_col] + "> " +
+        df[smiles_col].astype(str) +
+        (tokenizer.eos_token or "")
     )
 
     # Filter out rows where tokenized length exceeds filter_len
@@ -113,13 +144,10 @@ def dataframe_to_tokenized_dataset(
     )
     df = df[df["tokenized_len"] < filter_len].copy()
 
-    # create Dataset from df using only the text column containing formatted examples (i.e. "<np class>+SMILES")
+    # create Dataset from df using only the text column containing formatted examples
     ds = Dataset.from_pandas(df[["train_text"]], preserve_index=False)
 
     def _tokenize_batch(batch: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        tokenize dataset in batches
-        """
         return tokenizer(
             batch["train_text"],
             add_special_tokens=False,
@@ -129,10 +157,75 @@ def dataframe_to_tokenized_dataset(
             return_attention_mask=True,
         )
 
-    # tokenize dataset in batches and remove original text column for memory efficiency
     ds = ds.map(_tokenize_batch, batched=True, remove_columns=["train_text"])
-
     return ds
+
+
+def conditioning_dropout_collator(tokenizer, special_token_dropout_prob, drop_all_special_tokens_prob):
+    """
+    The data collator takes a batch of tokenized inputs and processes them to produce tensors 
+    ready for input to the model during training and evaluation. 
+
+    This custom data collator will:
+    1. randomly drop conditioning special tokens during training
+    2. pad variable length examples in a batch
+    3. exclude conditioning tokens and padding from next-token loss in training and evaluation
+
+    Assumptions:
+    - conditioning tokens are in tokenizer.additional_special_tokens
+    """
+
+    pad_to_batch = DataCollatorWithPadding(tokenizer) # load base data collator
+
+    # define set of special token ids for dropout
+    special_token_ids = set( 
+        tokenizer.convert_tokens_to_ids(tokenizer.additional_special_tokens)
+    )
+
+    def data_collator(batch_smiles):
+        # enable stochastic conditioning label dropout only during training when .is_grad_enabled() == True
+        enable_dropout = torch.is_grad_enabled() and (special_token_dropout_prob > 0 or drop_all_special_tokens_prob > 0) 
+
+        if enable_dropout:
+            for smiles_seq in batch_smiles:                
+                token_ids = smiles_seq["input_ids"] # extract list of token IDs for single input 
+
+                # some percentage of the time remove all special conditioning tokens
+                if drop_all_special_tokens_prob and random.random() < drop_all_special_tokens_prob:
+                    new_token_ids = []
+                    for t in token_ids:
+                        if t not in special_token_ids:
+                            new_token_ids.append(t)
+                    token_ids = new_token_ids
+                else:
+                    # drop each special token independently with probability given by special_token_dropout_prob
+                    new_token_ids = []
+                    for t in token_ids:
+                        if t in special_token_ids:
+                            if random.random() < special_token_dropout_prob:
+                                continue # drop special token
+                        new_token_ids.append(t)
+                    token_ids = new_token_ids
+                        
+                smiles_seq["input_ids"] = token_ids # write back the input sequence with stochastic dropout applied
+                smiles_seq["attention_mask"] = [1] * len(token_ids)  # update attention mask with new sequence length
+                
+                # print statements for debugging
+                print("Original:", smiles_seq["input_ids"])
+                print("After dropout:", token_ids)
+
+        batch = pad_to_batch(batch_smiles) # pad each sequence in batch to same length (to produce rectangular tensor)                
+
+        labels = batch["input_ids"].clone()                
+        labels[batch["attention_mask"] == 0] = -100 # mask padded positions from loss       
+
+        # ignore special conditioning tokens in the loss
+        for tok_id in special_token_ids:
+            labels[batch["input_ids"] == tok_id] = -100
+
+        batch["labels"] = labels
+
+        return batch
 
 
 def main():
@@ -164,8 +257,15 @@ def main():
     )
 
     special_tokens_dict = build_special_class_tokens(
-        args.train_csv, configs["base"]["class_col"]
+        args.train_csv, 
+        configs["base"]["pathway_col"],
+        configs["base"]["superclass_col"],
+        configs["base"]["aromatic_rings_count"],
+        configs["base"]["is_glycoside"],
+        configs["base"]["qed_bin"],
+        configs["base"]["sa_bin"],
     )
+    
     model, tokenizer = update_tokenizer_with_special_tokens(
         model, tokenizer, special_tokens_dict
     )
@@ -180,7 +280,12 @@ def main():
         train_df,
         tokenizer=tokenizer,
         smiles_col=configs["base"]["smiles_col"],
-        class_col=configs["base"]["class_col"],
+        pathway_col=configs["base"]["pathway_col"],
+        superclass_col=configs["base"]["superclass_col"],
+        is_glycoside_col=configs["base"]["is_glycoside"],
+        num_aromatic_rings_col=configs["base"]["aromatic_rings_count"],
+        qed_bin_col=configs["base"]["qed_bin"],
+        sa_bin_col=configs["base"]["sa_bin"],
         max_len=configs["base"]["max_token_length"],
     )
 
@@ -189,7 +294,12 @@ def main():
         test_df,
         tokenizer=tokenizer,
         smiles_col=configs["base"]["smiles_col"],
-        class_col=configs["base"]["class_col"],
+        pathway_col=configs["base"]["pathway_col"],
+        superclass_col=configs["base"]["superclass_col"],
+        is_glycoside_col=configs["base"]["is_glycoside"],
+        num_aromatic_rings_col=configs["base"]["aromatic_rings_count"],
+        qed_bin_col=configs["base"]["qed_bin"],
+        sa_bin_col=configs["base"]["sa_bin"],
         max_len=configs["base"]["max_token_length"],
     )
 
@@ -198,7 +308,12 @@ def main():
         val_df,
         tokenizer=tokenizer,
         smiles_col=configs["base"]["smiles_col"],
-        class_col=configs["base"]["class_col"],
+        pathway_col=configs["base"]["pathway_col"],
+        superclass_col=configs["base"]["superclass_col"],
+        is_glycoside_col=configs["base"]["is_glycoside"],
+        num_aromatic_rings_col=configs["base"]["aromatic_rings_count"],
+        qed_bin_col=configs["base"]["qed_bin"],
+        sa_bin_col=configs["base"]["sa_bin"],
         max_len=configs["base"]["max_token_length"],
     )
 
@@ -206,10 +321,9 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # data collator takes variable-length tokenized examples and pads them to the same length to produce rectangular tensor
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm=False
-    )  # set mlm (masked language model) = False for causal LM
+    # specify custom data collator that enables stochastic special token dropout during training. 
+    data_collator = conditioning_dropout_collator(tokenizer, special_token_dropout_prob=configs["training"]["special_token_dropout_prob"], 
+                                                  drop_all_special_tokens_prob=configs["training"]["drop_all_special_tokens_prob"])
 
     # define arguments for training
     training_args = TrainingArguments(
@@ -219,9 +333,9 @@ def main():
         warmup_ratio=float(configs["training"]["warmup_ratio"]),
         per_device_train_batch_size=int(configs["training"]["per_device_train_batch_size"]),
         per_device_eval_batch_size=int(configs["training"]["per_device_eval_batch_size"]),
-	load_best_model_at_end=bool(configs["training"]["load_best_model_at_end"]),
+	    load_best_model_at_end=bool(configs["training"]["load_best_model_at_end"]),
         output_dir=configs["training"]["output_dir"],
-        fp16=False,  # enable mixed precision for faster training
+        fp16=False,  # turn off mixed precision 
 
         # W&B
         report_to=configs["training"]["report_to"],
@@ -230,8 +344,8 @@ def main():
         # Eval/save
         evaluation_strategy=configs["training"]["evaluation_strategy"],
         save_strategy=configs["training"]["save_strategy"],
-	save_safetensors=False,
-	metric_for_best_model=configs["training"]["metric_for_best_model"],
+	    save_safetensors=False,
+	    metric_for_best_model=configs["training"]["metric_for_best_model"],
         greater_is_better=bool(configs["training"]["greater_is_better"]),
         logging_steps=int(configs["training"]["logging_steps"]),
         save_total_limit=int(configs["training"]["save_total_limit"]),

@@ -6,13 +6,19 @@ base:
    model: "ibm-research/GP-MoLFormer-Uniq"
    tokenizer: "ibm-research/MoLFormer-XL-both-10pct"
    smiles_col: "canonical_smiles"
-   class_col: "np_classifier_pathway"
-   subclass_col: "np_classifier_superclass"
+   pathway_col: "np_classifier_pathway"
+   superclass_col: "np_classifier_superclass"
+   qed_bin: "qed_bin"
+   sa_bin: "sa_bin"
+   is_glycoside: "np_classifier_is_glycoside"
+   aromatic_rings_count: "aromatic_rings_count"
    max_token_length: 200
 
 training:
+   special_token_dropout_prob: 0.15 # dropout rate for each special token (independently applied to each special token)
+   drop_all_special_tokens_prob: 0.05 # percentage of inputs where all special tokens are dropped
    learning_rate: 5.0e-5
-   num_train_epochs: 3
+   num_train_epochs: 8
    weight_decay: 0.01
    per_device_train_batch_size: 8
    per_device_eval_batch_size: 8
@@ -20,9 +26,9 @@ training:
    evaluation_strategy: "epoch"
    save_strategy: "epoch"
    load_best_model_at_end: True
-   output_dir: "/workspace/NPComposer/runs/npcomposer_run1"
+   output_dir: "/workspace/NPComposer/runs/npcomposer_run3"
    report_to: ["wandb"]
-   run_name: "npcomposer_run1"
+   run_name: "npcomposer_run3"
    metric_for_best_model: "eval_loss"
    greater_is_better: False
    logging_steps: 500
