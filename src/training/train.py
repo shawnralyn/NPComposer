@@ -349,6 +349,7 @@ def main():
         greater_is_better=bool(configs["training"]["greater_is_better"]),
         logging_steps=int(configs["training"]["logging_steps"]),
         save_total_limit=int(configs["training"]["save_total_limit"]),
+        push_to_hub=bool(configs["training"]["push_to_hub"]),
     )
 
     # Trainer contains all necessary components of a training loop
@@ -367,6 +368,8 @@ def main():
 
     trainer.train()  # starts training
     trainer.save_model()  # save model so you can reload it using "from_pretrained()"
+    
+    trainer.push_to_hub(repo_name=configs["training"]["HuggingFace_repo"]) # push best model to HuggingFace Hub
 
 
 if __name__ == "__main__":
