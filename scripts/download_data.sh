@@ -12,6 +12,8 @@ CSV_URL="https://coconut.s3.uni-jena.de/prod/downloads/2026-01/coconut_csv-01-20
 echo "Downloading CSV (~208 MB)..."
 curl -L -o "$DATA_DIR/coconut_csv_full.zip" "$CSV_URL" --progress-bar
 
+sleep 5  # Be polite to the server
+
 #echo "Downloading SDF 3D (~305 MB)..."
 #curl -L -o "$DATA_DIR/coconut_sdf_3d_full.zip" "$SDF_URL" --progress-bar
 

@@ -39,10 +39,18 @@ NPComposer/
 ## Quick Start
 
 ```bash
+# Option 1: Using Make
 make all
+
+# Option 2: Using the full pipeline script
+bash scripts/run_pipeline.sh
+
+# Option 3: Skip download if data already exists
+bash scripts/run_pipeline.sh --skip-download --size 100000
 ```
 
-Runs: setup -> download -> subset -> split -> merge -> test.
+`make all` runs: setup -> download -> subset -> split -> merge -> test.
+`run_pipeline.sh` runs the same steps as a single script with configurable flags.
 
 For individual datasets:
 
@@ -168,6 +176,19 @@ Raw Data (COCONUT 715K / NPASS 203K)
 Subset (100K each) → Merge → training_data.csv → Train/Val/Test (seed=42)
     ↓ Distribution analysis (raw vs processed histograms + stats)
 ```
+
+### Filter Justifications
+
+- SA <= 6.0: Molecules with SA scores above 6 are considered very difficult to synthesize in practice (Ertl & Schuffenhauer, 2009). Since the goal of this tool is to propose synthetically accessible natural product candidates, excluding hard-to-synthesize molecules prevents the model from learning to generate impractical outputs. The SA scale ranges from 1 (easy) to 10 (hard), and a threshold of 6.0 retains the majority of drug-like natural products while filtering out highly complex structures.
+- Ring count <= 10: Natural products with more than 10 rings are rare outliers in COCONUT (< 1% of the dataset) and tend to be large macrocyclic or polymeric structures that are difficult to synthesize and characterize. Removing them reduces noise and keeps the training distribution focused on typical drug-like NP scaffolds.
+- Atom count <= 150: Molecules exceeding 150 heavy atoms are typically large polymeric or peptidic natural products that produce very long SMILES strings, leading to tokenization issues and disproportionate memory usage during training. This cutoff retains > 99% of the dataset.
+
+
+## Dataset Sources
+
+- COCONUT (COlleCtion of Open Natural prodUcTs): An open-access database aggregating natural product structures from over 50 individual sources including DNP, UNPD, NUBBEDB, and others. Contains ~715K molecules with SMILES, InChI, and molecular descriptors. Source: https://coconut.naturalproducts.net. License: open access. Reference: Sorokina et al., "COCONUT online: Collection of Open Natural Products database," J. Cheminform., 2021.
+- NPASS (Natural Product Activity and Species Source Database): A curated database of ~203K natural products with recorded biological activity data, species source information, and target annotations. Maintained by CSBIO, NUS. Source: https://bidd.group/NPASS/. Reference: Zeng et al., "NPASS: Natural product activity and species source database," Nucleic Acids Res., 2018.
+- NP-Drug: A dataset of ~3K natural products with known drug activity, used for downstream evaluation and drug discovery benchmarking. Source: downloaded via `scripts/download_np_drug.sh`.
 
 ## Computed Columns (RDKit)
 

@@ -27,6 +27,7 @@ echo "Downloading NPASS 3.0 files..."
 for file in "${FILES[@]}"; do
     echo "  $file"
     curl -L -o "$DATA_DIR/$file" "$BASE_URL/$file" --progress-bar
+    sleep 5  # Be polite to the server
 done
 
 echo "Done. Files in $DATA_DIR:"
