@@ -123,7 +123,6 @@ MoleculeEvaluator: evaluates generated molecules. PropertyPredictor: predicts AD
 
 Inputs:
 - smiles_list (List[str]): generated SMILES strings
-- classify (bool): run NPClassifier or not
 - np_repo_root (Optional[str]): NP-Classifier repo path
 
 Outputs:

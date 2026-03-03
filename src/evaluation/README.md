@@ -6,7 +6,7 @@ Evaluate generated molecules.
 
 ```bash
 python src/evaluation/metrics.py -i generated.txt -o results.json
-python src/evaluation/metrics.py -i generated.txt -o results.json --classify --np_root ~/NP-Classifier
+python src/evaluation/metrics.py -i generated.txt -o results.json --np_root ~/NP-Classifier
 ```
 
 **Input:** Text file with one SMILES per line.
@@ -41,6 +41,5 @@ python src/evaluation/metrics.py -i generated.txt -o results.json --classify --n
 
 | Flag | Description |
 |------|-------------|
-| `--classify` | Run NPClassifier (local, requires model files) |
 | `--np_root PATH` | Path to NP-Classifier repo (or set `NP_CLASSIFIER_ROOT` env) |
 | `--keep_np_per_mol` | Include per-molecule classification in output |

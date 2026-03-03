@@ -564,8 +564,6 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--n_jobs", type=int, default=-1,
                         help="Parallel workers (-1 = all cores, 1 = single)")
-    parser.add_argument("--classify", action="store_true",
-                        help="Add NPClassifier superclass labels (local model)")
     parser.add_argument("--np_root",
                         default=os.environ.get("NP_CLASSIFIER_ROOT"),
                         help="Path to NP-Classifier repo clone (or set NP_CLASSIFIER_ROOT env)")
@@ -583,20 +581,22 @@ def main():
     )
     subset = kmeans_subset(df, smiles_col, args.size, args.seed, fp_dim=args.fp_dim)
 
-    # NPClassifier superclass classification (pure local inference)
-    if args.classify:
-        if HAS_NPCLASSIFIER:
-            print("Classifying superclass (NPClassifier local model)...")
-            cache_dir = str(out_path.parent)
-            superclasses = classify_batch(
-                subset[smiles_col].tolist(),
-                cache_dir=cache_dir,
-                repo_root=args.np_root,
-                level="superclass",
-            )
-            subset['superclass'] = superclasses
-        else:
-            print("Warning: NPClassifier not available (check src/classification/npclassifier.py)")
+    # NPClassifier superclass classification (always runs)
+    if not HAS_NPCLASSIFIER:
+        print("Warning: NPClassifier module not available, skipping classification")
+    elif not args.np_root:
+        print("Warning: NP_CLASSIFIER_ROOT not set, skipping classification. "
+              "Set via --np_root or export NP_CLASSIFIER_ROOT=<path>")
+    else:
+        print("Classifying superclass (NPClassifier local model)...")
+        cache_dir = str(out_path.parent)
+        superclasses = classify_batch(
+            subset[smiles_col].tolist(),
+            cache_dir=cache_dir,
+            repo_root=args.np_root,
+            level="superclass",
+        )
+        subset['superclass'] = superclasses
 
     csv_path = f"{args.output}.csv"
     id_col = save_subset(subset, csv_path, smiles_col)

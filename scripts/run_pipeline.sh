@@ -54,20 +54,20 @@ echo ""
 echo "--- Step 3/6: Creating subsets ---"
 mkdir -p data/processed
 
-CLASSIFY_FLAG=""
+NP_FLAG=""
 if [ -n "$NP_CLASSIFIER_ROOT" ]; then
-    CLASSIFY_FLAG="--classify --np_root $NP_CLASSIFIER_ROOT"
+    NP_FLAG="--np_root $NP_CLASSIFIER_ROOT"
 fi
 
 python3 scripts/create_subset.py \
     -i data/raw/coconut_csv_full.csv \
     -o data/processed/coconut_${SIZE} \
-    -s $SIZE --sa_max $SA_MAX --seed $SEED $CLASSIFY_FLAG
+    -s $SIZE --sa_max $SA_MAX --seed $SEED $NP_FLAG
 
 python3 scripts/create_subset.py \
     -i data/raw/npass_full.csv \
     -o data/processed/npass_${SIZE} \
-    -s $SIZE --sa_max $SA_MAX --seed $SEED $CLASSIFY_FLAG
+    -s $SIZE --sa_max $SA_MAX --seed $SEED $NP_FLAG
 
 # Step 4: Merge training data
 echo ""

@@ -26,8 +26,7 @@ NPComposer/
 │   └── analyze_sdf.py          # Analyze SDF structure
 ├── src/
 │   ├── classification/
-│   │   ├── npclassifier.py     # NPClassifier local inference
-│   │   └── classyfire.py       # ClassyFire API (deprecated)
+│   │   └── npclassifier.py     # NPClassifier local inference
 │   └── evaluation/
 │       └── metrics.py          # Evaluation metrics
 ├── tests/                      # pytest test suite
@@ -103,7 +102,7 @@ make all CLASSIFY=false
 
 ```bash
 python src/evaluation/metrics.py -i generated.txt -o results.json \
-    --classify --np_root ~/NP-Classifier
+    --np_root ~/NP-Classifier
 ```
 
 ## Setup
@@ -135,13 +134,13 @@ make test-quick
 bash scripts/download_data.sh
 python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
     --sdf data/raw/coconut_sdf_3d_full.sdf \
-    -o data/processed/coconut_100000 -s 100000 --classify --seed 42
+    -o data/processed/coconut_100000 -s 100000 --seed 42
 
 # NPASS
 bash scripts/download_npass.sh
 python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv
 python scripts/create_subset.py -i data/raw/npass_full.csv \
-    -o data/processed/npass_100000 -s 100000 --classify --seed 42
+    -o data/processed/npass_100000 -s 100000 --seed 42
 
 # Merge training data
 python scripts/merge_training.py \
@@ -151,7 +150,7 @@ python scripts/merge_training.py \
 
 # Split & Evaluate
 python scripts/split_data.py -i data/processed/coconut_100000.csv -o data/splits/ --seed 42
-python src/evaluation/metrics.py -i generated.txt -o results.json --classify
+python src/evaluation/metrics.py -i generated.txt -o results.json
 ```
 
 ## Apptainer

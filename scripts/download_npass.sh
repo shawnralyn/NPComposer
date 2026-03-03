@@ -25,8 +25,13 @@ FILES=(
 echo "Downloading NPASS 3.0 files..."
 
 for file in "${FILES[@]}"; do
+    if [ -f "$DATA_DIR/$file" ] && [ -s "$DATA_DIR/$file" ]; then
+        echo "  $file (already exists, skipping)"
+        continue
+    fi
     echo "  $file"
-    curl -L -o "$DATA_DIR/$file" "$BASE_URL/$file" --progress-bar
+    curl -L --connect-timeout 120 --max-time 7200 --retry 10 --retry-delay 30 \
+        -o "$DATA_DIR/$file" "$BASE_URL/$file" --progress-bar
     sleep 5  # Be polite to the server
 done
 

@@ -33,12 +33,38 @@ def main():
     - Loads model and tokenizer from checkpoint specified in the config.
     - Generates a specified number of molecular SMILES strings conditioned on a class.
     - Writes generated SMILES strings to an output file.
+
+    CLI overrides (take precedence over YAML):
+        --seed          Random seed for reproducibility
+        --np_class      NP class conditioning token, e.g. "<NP:Fatty acids>"
+        --output        Output file path
+        --num_molecules Number of molecules to generate
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("--yaml", required=True, help="Inference yaml configuration file")
+    ap.add_argument("--seed", type=int, default=None, help="Random seed (overrides yaml)")
+    ap.add_argument("--np_class", type=str, default=None, help="NP class token (overrides yaml)")
+    ap.add_argument("--output", type=str, default=None, help="Output file path (overrides yaml)")
+    ap.add_argument("--num_molecules", type=int, default=None, help="Number of molecules (overrides yaml)")
     args = ap.parse_args()
 
     configs = parse_yaml(args.yaml)
+
+    # CLI overrides
+    if args.np_class is not None:
+        configs["inference"]["np_class"] = args.np_class
+    if args.output is not None:
+        configs["inference"]["output_file"] = args.output
+    if args.num_molecules is not None:
+        configs["inference"]["num_molecules"] = args.num_molecules
+
+    # Set random seed for reproducibility
+    seed = args.seed if args.seed is not None else configs["inference"].get("seed", None)
+    if seed is not None:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        print(f"Random seed: {seed}")
 
     ckpt = configs["inference"]["ckpt_path"]  # load checkpoint path
 
@@ -54,12 +80,20 @@ def main():
 
     out_file.write_text("")  # overwrite contents of file
 
+    np_class = configs["inference"]["np_class"]
+    num_molecules = int(configs["inference"]["num_molecules"])
+    print(f"Generating {num_molecules} molecules for class: {np_class}")
+
     # create starting sequence
-    x = tok(configs["inference"]["np_class"], return_tensors="pt", add_special_tokens=False)
+    x = tok(np_class, return_tensors="pt", add_special_tokens=False)
+
+    # Prefix length: skip the conditioning token in decoded output
+    prompt_len = x["input_ids"].shape[1]
 
     # generate n number of molecules and append each SMILES string to output file
+    generated = 0
     with out_file.open("a") as f:
-        for _ in range(int(configs["inference"]["num_molecules"])):
+        for _ in range(num_molecules):
             y = model.generate(
                 **x,
                 max_new_tokens=200,  # set to max tokens used for training
@@ -70,10 +104,17 @@ def main():
                 pad_token_id=tok.eos_token_id,
             )
 
-            filtered_tok = tok.decode(y[0], skip_special_tokens=True).split(".")[0]  # grab first SMILES string in output
+            # Decode only the generated tokens (skip conditioning prompt)
+            generated_ids = y[0][prompt_len:]
+            raw = tok.decode(generated_ids, skip_special_tokens=True).strip()
+            # Take first molecule (split on '.')
+            smiles = raw.split(".")[0].strip()
 
-            if filtered_tok:
-                f.write(filtered_tok + "\n")
+            if smiles:
+                f.write(smiles + "\n")
+                generated += 1
+
+    print(f"Generated {generated}/{num_molecules} molecules -> {out_file}")
 
 
 if __name__ == "__main__":

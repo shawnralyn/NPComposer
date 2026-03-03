@@ -27,7 +27,6 @@ MAX_RINGS    ?= 10
 FP_DIM       ?= 3
 SEED         ?= 42
 N_JOBS       ?= -1
-CLASSIFY     ?= true
 NP_ROOT      ?= $(NP_CLASSIFIER_ROOT)
 TRAIN_RATIO  ?= 0.8
 VAL_RATIO    ?= 0.1
@@ -101,7 +100,6 @@ subset-coconut: ## Create COCONUT subset
 		--fp_dim $(FP_DIM) \
 		--n_jobs $(N_JOBS) \
 		--seed $(SEED) \
-		$(if $(filter true,$(CLASSIFY)),--classify,) \
 		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
 
 .PHONY: subset-npass
@@ -118,7 +116,6 @@ subset-npass: ## Create NPASS subset
 		--fp_dim $(FP_DIM) \
 		--n_jobs $(N_JOBS) \
 		--seed $(SEED) \
-		$(if $(filter true,$(CLASSIFY)),--classify,) \
 		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
 
 # Merge Training Data
@@ -184,7 +181,6 @@ endif
 	$(PYTHON) src/evaluation/metrics.py \
 		-i $(INPUT) \
 		-o results.json \
-		$(if $(filter true,$(CLASSIFY)),--classify,) \
 		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
 
 # Distribution Analysis

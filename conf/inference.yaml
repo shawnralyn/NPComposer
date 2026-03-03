@@ -1,7 +1,8 @@
 inference:
   num_molecules: 100
-  ckpt_path: "/Users/sr/Documents/Downloads/np_composer_run2/checkpoint_196590"
-  output_file: "/Users/sr/Documents/NPComposer/data/fatty_acids_generation.txt"
+  ckpt_path: "/Users/juyeong/checkpoint_196590"
+  output_file: "outputs/generation.txt"
   top_p: 0.95
   temperature: 1.0
+  seed: 42
   np_class: "<NP:Fatty acids>" # format with <NP:[class]>
