@@ -23,12 +23,21 @@ NPComposer/
 │   ├── merge_training.py       # Merge subsets into training data
 │   ├── split_data.py           # Train/Val/Test split
 │   ├── analyze_distribution.py # Raw vs processed distribution analysis
-│   └── analyze_sdf.py          # Analyze SDF structure
+│   ├── analyze_sdf.py          # Analyze SDF structure
+│   ├── run_evaluation_Shawn_model1.sh          # Shawn_model1 evaluation
+│   ├── run_evaluation_Shawn_model1_optimal.sh  # + SA/QED optimal
+│   ├── run_evaluation_Shawn_model1_pathway_optimal.sh  # + pathway
+│   ├── run_evaluation_NPGPT.sh # NPGPT baseline evaluation
+│   └── npgpt_generate.py       # NPGPT generation wrapper (seed control)
 ├── src/
 │   ├── classification/
-│   │   └── npclassifier.py     # NPClassifier local inference
-│   └── evaluation/
-│       └── metrics.py          # Evaluation metrics
+│   │   └── npclassifier.py     # NPClassifier local inference (batched)
+│   ├── evaluation/
+│   │   └── metrics.py          # Evaluation metrics (validity, SA, QED, diversity, uniqueness, novelty)
+│   └── inference/
+│       └── inference.py        # NPComposer inference
+├── external/
+│   └── npgpt/                  # NPGPT baseline (gitignored)
 ├── tests/                      # pytest test suite
 ├── Makefile                    # Build automation
 ├── npcomposer.def              # Apptainer container definition
@@ -104,6 +113,79 @@ make all CLASSIFY=false
 python src/evaluation/metrics.py -i generated.txt -o results.json \
     --np_root ~/NP-Classifier
 ```
+
+## Model Evaluation
+
+Evaluation scripts generate molecules, then compute validity, SA, QED, internal diversity, uniqueness, and novelty. Uniqueness is measured as the fraction of generated canonical SMILES not found in the full COCONUT training set (Geo2Seq, ICML 2025). Novelty is measured as the fraction of molecules whose nearest-neighbor Tanimoto similarity (Morgan FP, radius=2, 1024 bits) to a K-means reference subset falls below 0.4 (f-RAG, NeurIPS 2024).
+
+### Shawn_model1 (superclass-conditioned)
+
+Generates 10 molecules per superclass (76 total) across 3 random seeds.
+
+```bash
+make eval-shawn                          # full (76 superclasses × 10 × 3 seeds)
+make eval-shawn EVAL_TOP=3              # test with top 3 superclasses
+make eval-shawn EVAL_NUM=20             # 20 molecules per superclass
+make eval-shawn-optimal                  # + SA best + QED best conditioning
+make eval-shawn-pathway                  # pathway + SA/QED optimal (7 pathways)
+```
+
+Or run scripts directly:
+
+```bash
+bash scripts/run_evaluation_Shawn_model1.sh
+bash scripts/run_evaluation_Shawn_model1.sh --top 3 --num 20 --seeds "1 2 3 4 5"
+```
+
+Results are saved to `outputs/Shawn_model1/evaluation/`.
+
+### NPGPT (unconditional baseline)
+
+NPGPT generates SMILES without class conditioning. We generate 760 molecules per seed (matching Shawn_model1's total of 76 × 10) to compare fairly.
+
+Prerequisites:
+
+```bash
+cd external/npgpt
+git submodule update --init --recursive
+uv sync
+# Download checkpoint from Google Drive:
+# https://drive.google.com/drive/folders/1olCPouDkaJ2OBdNaM-G7IU8T6fBpvPMy
+# Place as: external/npgpt/checkpoints/smiles-gpt/model.ckpt
+```
+
+Run evaluation:
+
+```bash
+make eval-npgpt                          # 760 molecules × 3 seeds
+make eval-npgpt-classify                 # + NPClassifier superclass distribution
+```
+
+Or run script directly:
+
+```bash
+bash scripts/run_evaluation_NPGPT.sh
+bash scripts/run_evaluation_NPGPT.sh --num 100 --seeds "1 2 3"
+```
+
+Results are saved to `outputs/NPGPT/evaluation/`.
+
+### Run All Evaluations
+
+```bash
+make eval-all                            # Shawn_model1 + NPGPT
+```
+
+### Evaluation Metrics
+
+| Metric | Definition | Reference |
+|--------|-----------|-----------|
+| Validity | Fraction of valid SMILES (RDKit parseable) | — |
+| SA Score | Synthetic accessibility (1=easy, 10=hard) | Ertl & Schuffenhauer, 2009 |
+| QED | Drug-likeness (0–1, higher=better) | Bickerton et al., 2012 |
+| Internal Diversity | Mean pairwise Tanimoto distance among generated molecules | — |
+| Uniqueness | Fraction of generated SMILES not in training set | Geo2Seq (ICML 2025) |
+| Novelty | Fraction with NN Tanimoto similarity < 0.4 to reference set | f-RAG (NeurIPS 2024) |
 
 ## Setup
 

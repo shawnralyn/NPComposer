@@ -84,18 +84,18 @@ def compute_internal_diversity(smiles_list: List[str], sample_size: int = 1000) 
     }
 
 
-def compute_novelty(generated_smiles: List[str], training_smiles: List[str]) -> Dict:
-    """Compute novelty: fraction of generated molecules not in training set.
+def compute_uniqueness(generated_smiles: List[str], training_smiles: List[str]) -> Dict:
+    """Compute uniqueness: fraction of generated molecules not in training set.
 
-    Compares canonical SMILES strings.
+    Compares canonical SMILES strings. A molecule is "unique" if it does not
+    appear in the training data (i.e., it is a genuinely new structure).
 
     Input:
         generated_smiles (List[str]): valid generated SMILES.
         training_smiles (List[str]): training set SMILES.
     Output:
-        dict with n_novel, n_total, novelty ratio.
+        dict with n_unique, n_total, uniqueness ratio.
     """
-    # canonicalize both sets for fair comparison
     def canon(s):
         mol = Chem.MolFromSmiles(s)
         if mol is None:
@@ -108,7 +108,7 @@ def compute_novelty(generated_smiles: List[str], training_smiles: List[str]) -> 
         if c:
             train_canonical.add(c)
 
-    n_novel = 0
+    n_unique = 0
     n_total = 0
     for s in generated_smiles:
         c = canon(s)
@@ -116,72 +116,115 @@ def compute_novelty(generated_smiles: List[str], training_smiles: List[str]) -> 
             continue
         n_total += 1
         if c not in train_canonical:
-            n_novel += 1
+            n_unique += 1
+
+    return {
+        "n_unique": n_unique,
+        "n_total": n_total,
+        "uniqueness": round(n_unique / n_total, 4) if n_total > 0 else 0,
+    }
+
+
+def _fps_to_numpy(fps, nbits=2048):
+    """Convert list of RDKit fingerprints to numpy bit array (n_mols x nbits)."""
+    arr = np.zeros((len(fps), nbits), dtype=np.uint8)
+    for i, fp in enumerate(fps):
+        on_bits = fp.GetOnBits()
+        for b in on_bits:
+            arr[i, b] = 1
+    return arr
+
+
+def compute_novelty(generated_smiles: List[str],
+                    training_smiles: List[str],
+                    threshold: float = 0.4,
+                    batch_size: int = 100) -> Dict:
+    """Compute novelty following f-RAG (NeurIPS 2024) definition.
+
+    A generated molecule is "novel" if its nearest-neighbor Tanimoto
+    similarity to the training set is below the threshold (default 0.4).
+    Uses Morgan fingerprint radius=2, 1024 bits (same as f-RAG).
+
+    Novelty = fraction of generated molecules where NN_sim < threshold.
+
+    Uses numpy vectorized Tanimoto for efficiency:
+        Tanimoto(A, B) = dot(A,B) / (|A| + |B| - dot(A,B))
+
+    Reference:
+        f-RAG (NeurIPS 2024): NN Tanimoto < 0.4 → novel.
+
+    Input:
+        generated_smiles (List[str]): valid generated SMILES.
+        training_smiles (List[str]): training set SMILES (K-means subset).
+        threshold (float): similarity threshold (default 0.4).
+        batch_size (int): process generated molecules in batches to save memory.
+    Output:
+        dict with n_novel, n_total, novelty (ratio), nn_sim_mean/std,
+        and threshold used.
+    """
+    # f-RAG uses Morgan FP radius=2, 1024 bits
+    FP_BITS = 1024
+    gen_fps = [_smiles_to_fp(s, radius=2, n_bits=FP_BITS) for s in generated_smiles]
+    gen_fps = [fp for fp in gen_fps if fp is not None]
+
+    train_fps = [_smiles_to_fp(s, radius=2, n_bits=FP_BITS) for s in training_smiles]
+    train_fps = [fp for fp in train_fps if fp is not None]
+
+    if not gen_fps or not train_fps:
+        return {"n_novel": 0, "n_total": 0, "novelty": 0,
+                "nn_sim_mean": None, "nn_sim_std": None, "threshold": threshold}
+
+    print(f"  Computing novelty (f-RAG): {len(gen_fps)} generated vs "
+          f"{len(train_fps)} training, threshold={threshold}")
+
+    # Convert training set to numpy (done once, reused across batches)
+    train_np = _fps_to_numpy(train_fps, nbits=FP_BITS).astype(np.float32)
+    train_bits = train_np.sum(axis=1)
+
+    nn_sims = []
+    for i in range(0, len(gen_fps), batch_size):
+        batch_fps = gen_fps[i:i + batch_size]
+        gen_np = _fps_to_numpy(batch_fps, nbits=FP_BITS).astype(np.float32)
+        gen_bits = gen_np.sum(axis=1)
+
+        intersection = gen_np @ train_np.T
+        union = gen_bits[:, None] + train_bits[None, :] - intersection
+        sim_matrix = np.divide(intersection, union,
+                               out=np.zeros_like(intersection), where=union > 0)
+        max_sims = sim_matrix.max(axis=1)
+        nn_sims.extend(max_sims.tolist())
+
+    nn_sims = np.array(nn_sims)
+    n_novel = int((nn_sims < threshold).sum())
+    n_total = len(nn_sims)
 
     return {
         "n_novel": n_novel,
         "n_total": n_total,
         "novelty": round(n_novel / n_total, 4) if n_total > 0 else 0,
-    }
-
-
-def compute_training_similarity(generated_smiles: List[str],
-                                 training_smiles: List[str],
-                                 sample_size: int = 1000) -> Dict:
-    """Compute nearest-neighbor Tanimoto similarity to training set.
-
-    For each generated molecule, find the most similar molecule in the training
-    set and report statistics over these nearest-neighbor similarities.
-
-    Input:
-        generated_smiles (List[str]): valid generated SMILES.
-        training_smiles (List[str]): training set SMILES.
-        sample_size (int): max training molecules to compare against.
-    Output:
-        dict with mean, std, min, max of nearest-neighbor similarities.
-    """
-    gen_fps = [(s, _smiles_to_fp(s)) for s in generated_smiles]
-    gen_fps = [(s, fp) for s, fp in gen_fps if fp is not None]
-
-    train_fps = [_smiles_to_fp(s) for s in training_smiles]
-    train_fps = [fp for fp in train_fps if fp is not None]
-
-    if not gen_fps or not train_fps:
-        return {"mean": None, "std": None, "min": None, "max": None}
-
-    # subsample training fps if too large
-    if len(train_fps) > sample_size:
-        rng = np.random.default_rng(42)
-        idx = rng.choice(len(train_fps), size=sample_size, replace=False)
-        train_fps = [train_fps[i] for i in idx]
-
-    nn_sims = []
-    for _, gen_fp in gen_fps:
-        sims = DataStructs.BulkTanimotoSimilarity(gen_fp, train_fps)
-        nn_sims.append(max(sims))
-
-    return {
-        "mean": round(np.mean(nn_sims), 4),
-        "std": round(np.std(nn_sims), 4),
-        "min": round(np.min(nn_sims), 4),
-        "max": round(np.max(nn_sims), 4),
+        "nn_sim_mean": round(float(nn_sims.mean()), 4),
+        "nn_sim_std": round(float(nn_sims.std()), 4),
+        "threshold": threshold,
     }
 
 
 def evaluate(smiles_list: List[str],
              np_repo_root: str = None,
              keep_np_per_mol: bool = False,
-             training_file: str = None) -> Dict:
-    """Compute validity, SA, QED, NP-likeness, diversity, novelty, and training similarity.
+             training_file: str = None,
+             novelty_file: str = None) -> Dict:
+    """Compute validity, SA, QED, NP-likeness, diversity, uniqueness, novelty.
 
     Input:
         smiles_list: list of SMILES strings.
         np_repo_root: path to NP-Classifier repo clone (or set NP_CLASSIFIER_ROOT env).
         keep_np_per_mol: if True, store per-molecule NPClassifier assignments.
-        training_file: path to training CSV for novelty/similarity checks.
+        training_file: path to full training CSV for uniqueness (exact match).
+        novelty_file: path to K-means subset CSV for novelty (Tanimoto NN < 0.4).
+                      If not given, falls back to training_file.
     Output:
         dict with keys: n_total, n_valid, validity, sa_score, qed, np_score,
-        internal_diversity, novelty, training_similarity,
+        internal_diversity, uniqueness, novelty,
         and optionally npclassifier distributions.
     """
     sa, qed_scores, np_scores = [], [], []
@@ -228,31 +271,35 @@ def evaluate(smiles_list: List[str],
     if valid_smiles:
         print("Computing internal diversity...")
         results["internal_diversity"] = compute_internal_diversity(valid_smiles)
-        results["uniqueness"] = round(len(set(valid_smiles)) / len(valid_smiles), 4) if valid_smiles else 0
+        results["non_duplicate"] = round(len(set(valid_smiles)) / len(valid_smiles), 4) if valid_smiles else 0
 
-    # Novelty and training similarity (requires training data)
-    if training_file and valid_smiles:
+    def _load_smiles(filepath, label="data"):
+        """Load SMILES from a CSV file."""
         import pandas as pd
-        print(f"Loading training data from {training_file}...")
-        train_df = pd.read_csv(training_file, low_memory=False)
-
-        # auto-detect SMILES column
-        smiles_col = None
+        print(f"Loading {label} from {filepath}...")
+        df = pd.read_csv(filepath, low_memory=False)
         for col in ['canonical_smiles', 'SMILES', 'smiles']:
-            if col in train_df.columns:
-                smiles_col = col
-                break
-        if smiles_col is None:
-            print("Warning: could not detect SMILES column in training file, skipping novelty/similarity")
-        else:
-            train_smiles = train_df[smiles_col].dropna().tolist()
-            print(f"  Training set: {len(train_smiles):,} molecules")
+            if col in df.columns:
+                smiles = df[col].dropna().tolist()
+                print(f"  {label}: {len(smiles):,} molecules")
+                return smiles
+        print(f"Warning: no SMILES column found in {filepath}")
+        return None
 
-            print("Computing novelty...")
-            results["novelty"] = compute_novelty(valid_smiles, train_smiles)
+    # Uniqueness: exact match against full training set
+    if training_file and valid_smiles:
+        train_smiles = _load_smiles(training_file, "training data (full)")
+        if train_smiles:
+            print("Computing uniqueness (Geo2Seq: not in training set)...")
+            results["uniqueness"] = compute_uniqueness(valid_smiles, train_smiles)
 
-            print("Computing training similarity (nearest-neighbor Tanimoto)...")
-            results["training_similarity"] = compute_training_similarity(valid_smiles, train_smiles)
+    # Novelty: NN Tanimoto < 0.4 against K-means subset
+    nov_file = novelty_file or training_file
+    if nov_file and valid_smiles:
+        nov_smiles = _load_smiles(nov_file, "novelty reference (K-means subset)") if nov_file != training_file else train_smiles
+        if nov_smiles:
+            print("Computing novelty (f-RAG: NN Tanimoto < 0.4)...")
+            results["novelty"] = compute_novelty(valid_smiles, nov_smiles)
 
     # NPClassifier (pure local inference) classification
     if valid_smiles:
@@ -291,7 +338,9 @@ def main():
     parser.add_argument("--keep_np_per_mol", action="store_true",
                         help="Store per-molecule NPClassifier assignments in output JSON")
     parser.add_argument("--training", default=None,
-                        help="Training CSV file for novelty and similarity evaluation")
+                        help="Full training CSV for uniqueness (exact match)")
+    parser.add_argument("--novelty_ref", default=None,
+                        help="K-means subset CSV for novelty (Tanimoto NN). Falls back to --training if not given.")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -312,6 +361,7 @@ def main():
         np_repo_root=args.np_root,
         keep_np_per_mol=args.keep_np_per_mol,
         training_file=args.training,
+        novelty_file=args.novelty_ref,
     )
 
     print(f"\nResults:")
@@ -320,17 +370,18 @@ def main():
     print(f"  QED: {results['qed']['mean']} +/- {results['qed']['std']}")
     if results['np_score']:
         print(f"  NP: {results['np_score']['mean']} +/- {results['np_score']['std']}")
-    if 'uniqueness' in results:
-        print(f"  Uniqueness: {results['uniqueness']*100:.1f}%")
+    if 'non_duplicate' in results:
+        print(f"  Non-duplicate: {results['non_duplicate']*100:.1f}%")
     if 'internal_diversity' in results and results['internal_diversity']['mean'] is not None:
         d = results['internal_diversity']
         print(f"  Internal diversity: {d['mean']} +/- {d['std']} (min={d['min']}, max={d['max']})")
-    if 'novelty' in results:
+    if 'uniqueness' in results:
+        u = results['uniqueness']
+        print(f"  Uniqueness (not in training): {u['n_unique']}/{u['n_total']} ({u['uniqueness']*100:.1f}%)")
+    if 'novelty' in results and results['novelty']['n_total'] > 0:
         nov = results['novelty']
-        print(f"  Novelty: {nov['n_novel']}/{nov['n_total']} ({nov['novelty']*100:.1f}%)")
-    if 'training_similarity' in results and results['training_similarity']['mean'] is not None:
-        ts = results['training_similarity']
-        print(f"  NN similarity to training: {ts['mean']} +/- {ts['std']} (min={ts['min']}, max={ts['max']})")
+        print(f"  Novelty (NN sim < {nov['threshold']}): {nov['n_novel']}/{nov['n_total']} ({nov['novelty']*100:.1f}%)")
+        print(f"    NN similarity: {nov['nn_sim_mean']} +/- {nov['nn_sim_std']}")
     if 'superclass_distribution' in results:
         print(f"  Superclasses ({results['n_superclasses']}):")
         for cls, count in sorted(results['superclass_distribution'].items(),

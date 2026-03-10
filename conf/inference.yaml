@@ -1,8 +1,8 @@
 inference:
   num_molecules: 100
-  ckpt_path: "/Users/juyeong/checkpoint_196590"
+  ckpt_path: "ralyn/NPComposer-v2"
   output_file: "outputs/generation.txt"
   top_p: 0.95
   temperature: 1.0
   seed: 42
-  np_class: "<NP:Fatty acids>" # format with <NP:[class]>
+  np_class: "<np_classifier_pathway:Alkaloids> <np_classifier_superclass:Tryptophan alkaloids>"

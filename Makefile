@@ -9,6 +9,9 @@
 #   make pipeline-npass     NPASS pipeline (merge -> subset -> split)
 #   make merge-training     Merge COCONUT + NPASS subsets into training_data.csv
 #   make analyze-dist       Compare raw vs processed distributions
+#   make eval-shawn         Evaluate Shawn_model1 (superclass-conditioned)
+#   make eval-npgpt         Evaluate NPGPT baseline (unconditional)
+#   make eval-all           Run all model evaluations
 #   make test               Run pytest
 #   make apptainer          Build Apptainer SIF image
 #   make clean              Remove generated artifacts
@@ -91,7 +94,7 @@ subset-coconut: ## Create COCONUT subset
 	@mkdir -p $(DATA_PROCESSED)
 	$(PYTHON) scripts/create_subset.py \
 		-i $(COCONUT_CSV) \
-		--sdf $(COCONUT_SDF) \
+		$(if $(wildcard $(COCONUT_SDF)),--sdf $(COCONUT_SDF),) \
 		-o $(DATA_PROCESSED)/coconut_$(SIZE) \
 		-s $(SIZE) \
 		--sa_max $(SA_MAX) \
@@ -105,6 +108,7 @@ subset-coconut: ## Create COCONUT subset
 .PHONY: subset-npass
 subset-npass: ## Create NPASS subset
 	@test -f $(NPASS_MERGED) || { echo "Error: $(NPASS_MERGED) not found. Run 'make merge-npass' first."; exit 1; }
+	@test $$(wc -l < $(NPASS_MERGED)) -gt 1 || { echo "Error: $(NPASS_MERGED) is empty. Run 'make merge-npass' first."; exit 1; }
 	@mkdir -p $(DATA_PROCESSED)
 	$(PYTHON) scripts/create_subset.py \
 		-i $(NPASS_MERGED) \
@@ -183,6 +187,46 @@ endif
 		-o results.json \
 		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
 
+# Model-specific Evaluations
+EVAL_SEEDS   ?= "1 2 3"
+EVAL_NUM     ?= 10
+EVAL_TOP     ?= 0
+
+.PHONY: eval-shawn
+eval-shawn: ## Evaluate Shawn_model1 (76 superclasses × NUM × SEEDS)
+	bash scripts/run_evaluation_Shawn_model1.sh \
+		--seeds $(EVAL_SEEDS) \
+		--num $(EVAL_NUM) \
+		$(if $(filter-out 0,$(EVAL_TOP)),--top $(EVAL_TOP),)
+
+.PHONY: eval-shawn-optimal
+eval-shawn-optimal: ## Evaluate Shawn_model1 with SA/QED optimal conditioning
+	bash scripts/run_evaluation_Shawn_model1_optimal.sh \
+		--seeds $(EVAL_SEEDS) \
+		--num $(EVAL_NUM) \
+		$(if $(filter-out 0,$(EVAL_TOP)),--top $(EVAL_TOP),)
+
+.PHONY: eval-shawn-pathway
+eval-shawn-pathway: ## Evaluate Shawn_model1 with pathway + SA/QED optimal
+	bash scripts/run_evaluation_Shawn_model1_pathway_optimal.sh \
+		--seeds $(EVAL_SEEDS)
+
+.PHONY: eval-npgpt
+eval-npgpt: ## Evaluate NPGPT baseline (unconditional generation)
+	bash scripts/run_evaluation_NPGPT.sh \
+		--seeds $(EVAL_SEEDS) \
+		--num 760
+
+.PHONY: eval-npgpt-classify
+eval-npgpt-classify: ## Evaluate NPGPT + NPClassifier superclass distribution
+	bash scripts/run_evaluation_NPGPT.sh \
+		--seeds $(EVAL_SEEDS) \
+		--num 760 \
+		--classify
+
+.PHONY: eval-all
+eval-all: eval-shawn eval-npgpt ## Run all model evaluations
+
 # Distribution Analysis
 
 .PHONY: analyze-dist
@@ -228,11 +272,13 @@ all-npass: setup download-npass pipeline-npass ## Full NPASS: setup -> download 
 # Testing
 
 .PHONY: test
-test: ## Run all tests
+test: ## Run all tests (editable install + pytest)
+	$(PIP) install --no-deps -e .
 	$(PYTHON) -m pytest tests/ -v
 
 .PHONY: test-quick
 test-quick: ## Run tests (no slow markers)
+	$(PIP) install --no-deps -e .
 	$(PYTHON) -m pytest tests/ -v -m "not slow"
 
 # Apptainer / Singularity
@@ -282,5 +328,6 @@ help: ## Show available targets
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Override variables:  make subset-coconut SIZE=100000 SA_MAX=5.0 SEED=123"
+	@echo "Evaluation:         make eval-shawn EVAL_NUM=10 EVAL_SEEDS='1 2 3' EVAL_TOP=3"
 	@echo "NPClassifier:      export NP_CLASSIFIER_ROOT=~/NP-Classifier && make all"
 	@echo ""

@@ -367,6 +367,10 @@ def load_and_filter(input_path, smiles_col=None, sa_max=6.0,
     df = df[df['_valid']].copy()
     print(f"  Valid SMILES: {n_init:,} -> {len(df):,}")
 
+    if len(df) == 0:
+        raise ValueError(f"No valid molecules found in {input_path}. "
+                         "Check that the file has data (not just headers).")
+
     n_before = len(df)
     df = df[df['atom_count'] <= max_atoms].copy()
     print(f"  Atom count (<= {max_atoms}): {n_before:,} -> {len(df):,}")
@@ -555,7 +559,7 @@ def main():
     parser.add_argument("-i", "--input", required=True, help="Input CSV")
     parser.add_argument("--sdf", help="Input SDF (optional)")
     parser.add_argument("-o", "--output", required=True, help="Output prefix")
-    parser.add_argument("-s", "--size", type=int, default=10000, help="Target size")
+    parser.add_argument("-s", "--size", type=int, default=5000, help="Target size (default: 5000)")
     parser.add_argument("--sa_max", type=float, default=6.0, help="Max SA score")
     parser.add_argument("--max_atoms", type=int, default=150, help="Max atom count")
     parser.add_argument("--max_rings", type=int, default=10, help="Max ring count")
@@ -564,6 +568,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--n_jobs", type=int, default=-1,
                         help="Parallel workers (-1 = all cores, 1 = single)")
+    parser.add_argument("--classify", action="store_true",
+                        help="Run NPClassifier superclass classification (off by default)")
     parser.add_argument("--np_root",
                         default=os.environ.get("NP_CLASSIFIER_ROOT"),
                         help="Path to NP-Classifier repo clone (or set NP_CLASSIFIER_ROOT env)")
@@ -579,24 +585,26 @@ def main():
     df, smiles_col = load_and_filter(
         args.input, args.smiles_col, args.sa_max, args.max_atoms, args.max_rings
     )
+
     subset = kmeans_subset(df, smiles_col, args.size, args.seed, fp_dim=args.fp_dim)
 
-    # NPClassifier superclass classification (always runs)
-    if not HAS_NPCLASSIFIER:
-        print("Warning: NPClassifier module not available, skipping classification")
-    elif not args.np_root:
-        print("Warning: NP_CLASSIFIER_ROOT not set, skipping classification. "
-              "Set via --np_root or export NP_CLASSIFIER_ROOT=<path>")
-    else:
-        print("Classifying superclass (NPClassifier local model)...")
-        cache_dir = str(out_path.parent)
-        superclasses = classify_batch(
-            subset[smiles_col].tolist(),
-            cache_dir=cache_dir,
-            repo_root=args.np_root,
-            level="superclass",
-        )
-        subset['superclass'] = superclasses
+    # NPClassifier superclass classification (only with --classify flag)
+    if args.classify:
+        if not HAS_NPCLASSIFIER:
+            print("Warning: NPClassifier module not available, skipping classification")
+        elif not args.np_root:
+            print("Warning: NP_CLASSIFIER_ROOT not set, skipping classification. "
+                  "Set via --np_root or export NP_CLASSIFIER_ROOT=<path>")
+        else:
+            print("Classifying superclass (NPClassifier local model)...")
+            cache_dir = str(out_path.parent)
+            superclasses = classify_batch(
+                subset[smiles_col].tolist(),
+                cache_dir=cache_dir,
+                repo_root=args.np_root,
+                level="superclass",
+            )
+            subset['superclass'] = superclasses
 
     csv_path = f"{args.output}.csv"
     id_col = save_subset(subset, csv_path, smiles_col)

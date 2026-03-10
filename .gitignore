@@ -51,6 +51,9 @@ multirun/
 *.ckpt
 checkpoints/
 
+# External programs (not ours)
+external/npgpt/
+
 # wandb
 src/training/checkpoint-200/
 src/training/wandb/

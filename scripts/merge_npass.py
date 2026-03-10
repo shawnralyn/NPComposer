@@ -65,8 +65,20 @@ def merge_npass(input_dir, output_path):
     toxicity = load_tsv(input_dir / "NPASS3.0_toxicity.txt")
     print(f"  {len(toxicity):,} toxicity records")
 
-    print("\nMerging structure...")
-    df = general.merge(structure, on='np_id', how='left')
+    # Structure file has different np_ids from generalinfo in NPASS 3.0
+    # Use structure as the base (it contains SMILES), left-join generalinfo
+    print("\nMerging structure (base) with generalinfo...")
+    # Check overlap
+    common = set(structure['np_id']) & set(general['np_id'])
+    print(f"  np_id overlap: {len(common):,} / structure={len(structure):,}, general={len(general):,}")
+
+    if len(common) > len(structure) * 0.5:
+        # Good overlap: merge normally
+        df = general.merge(structure, on='np_id', how='left')
+    else:
+        # Low overlap: use structure as base, left-join generalinfo
+        print("  Low overlap — using structure as base")
+        df = structure.merge(general, on='np_id', how='left')
     print(f"  {len(df):,} molecules")
 
     print("Aggregating activities...")

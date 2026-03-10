@@ -298,52 +298,91 @@ class NPClassifierLocal:
             dict with pathway, superclass, class_, pathway_all, superclass_all,
             class_all, isglycoside. Returns {'error': ...} on failure.
         """
-        fp = calculate_fingerprint(smiles, 2)
-        if fp is None:
-            return {"error": "invalid SMILES"}
+        results = self.classify_batch_raw([smiles])
+        return results[0]
 
-        formula, binary = fp
-        inp = {"input_2048": formula, "input_4096": binary}
+    def classify_batch_raw(self, smiles_list, batch_size=256):
+        """Classify a list of SMILES using batched inference.
 
-        pred_path = self.model_pathway.predict(inp, verbose=0)[0]
-        pred_super = self.model_superclass.predict(inp, verbose=0)[0]
-        pred_class = self.model_class.predict(inp, verbose=0)[0]
+        Input:
+            smiles_list: list of SMILES strings.
+            batch_size: number of molecules per GPU/CPU batch (default 256).
+        Output:
+            list of dicts (same length as input).
+        """
+        # Pre-compute all fingerprints
+        fps = []
+        for smi in smiles_list:
+            fp = calculate_fingerprint(smi, 2)
+            fps.append(fp)
 
-        n_path = list(np.where(pred_path >= 0.5)[0])
-        n_super = list(np.where(pred_super >= 0.3)[0])
-        n_class = list(np.where(pred_class >= 0.1)[0])
+        # Separate valid vs invalid
+        valid_indices = [i for i, fp in enumerate(fps) if fp is not None]
+        results = [{"error": "invalid SMILES"}] * len(smiles_list)
 
-        if not n_path:
-            n_path = [int(np.argmax(pred_path))]
+        if not valid_indices:
+            return results
 
-        path_from_class = []
-        for j in n_class:
-            path_from_class += self.ontology['Class_hierarchy'][str(j)]['Pathway']
-        path_from_class = list(set(path_from_class))
+        # Stack fingerprints into batched arrays
+        formulas = np.vstack([fps[i][0] for i in valid_indices])  # (N, 2048)
+        binaries = np.vstack([fps[i][1] for i in valid_indices])  # (N, 4096)
 
-        path_from_superclass = []
-        for j in n_super:
-            path_from_superclass += self.ontology['Super_hierarchy'][str(j)]['Pathway']
-        path_from_superclass = list(set(path_from_superclass))
+        # Batched model prediction (much faster than one-by-one)
+        print(f"  Batch predicting {len(valid_indices)} molecules (batch_size={batch_size})...")
+        inp = {"input_2048": formulas, "input_4096": binaries}
+        pred_paths = self.model_pathway.predict(inp, verbose=0, batch_size=batch_size)
+        pred_supers = self.model_superclass.predict(inp, verbose=0, batch_size=batch_size)
+        pred_classes = self.model_class.predict(inp, verbose=0, batch_size=batch_size)
 
-        glycoside = _isglycoside(smiles)
+        # Pre-compute glycoside flags
+        glycosides = [_isglycoside(smiles_list[i]) for i in valid_indices]
 
-        pw, sc, cl, gly = _vote_classification(
-            n_path, n_class, n_super,
-            pred_class, pred_super,
-            path_from_class, path_from_superclass,
-            glycoside, self.ontology
-        )
+        # Vote per molecule
+        it = range(len(valid_indices))
+        if HAS_TQDM:
+            it = tqdm(it, desc="NPClassifier voting")
 
-        return {
-            "pathway": pw[0] if pw else None,
-            "superclass": sc[0] if sc else None,
-            "class_": cl[0] if cl else None,
-            "pathway_all": pw,
-            "superclass_all": sc,
-            "class_all": cl,
-            "isglycoside": gly,
-        }
+        for j in it:
+            idx = valid_indices[j]
+            pred_path = pred_paths[j]
+            pred_super = pred_supers[j]
+            pred_class = pred_classes[j]
+
+            n_path = list(np.where(pred_path >= 0.5)[0])
+            n_super = list(np.where(pred_super >= 0.3)[0])
+            n_class = list(np.where(pred_class >= 0.1)[0])
+
+            if not n_path:
+                n_path = [int(np.argmax(pred_path))]
+
+            path_from_class = []
+            for k in n_class:
+                path_from_class += self.ontology['Class_hierarchy'][str(k)]['Pathway']
+            path_from_class = list(set(path_from_class))
+
+            path_from_superclass = []
+            for k in n_super:
+                path_from_superclass += self.ontology['Super_hierarchy'][str(k)]['Pathway']
+            path_from_superclass = list(set(path_from_superclass))
+
+            pw, sc, cl, gly = _vote_classification(
+                n_path, n_class, n_super,
+                pred_class, pred_super,
+                path_from_class, path_from_superclass,
+                glycosides[j], self.ontology
+            )
+
+            results[idx] = {
+                "pathway": pw[0] if pw else None,
+                "superclass": sc[0] if sc else None,
+                "class_": cl[0] if cl else None,
+                "pathway_all": pw,
+                "superclass_all": sc,
+                "class_all": cl,
+                "isglycoside": gly,
+            }
+
+        return results
 
 
 # -- Module-level API --------------------------------------------------------
@@ -388,12 +427,14 @@ def classify_batch(smiles_list, cache_dir=".", level="superclass",
     print(f"  Cache hits: {cached_hits:,}, to classify: {len(to_classify):,}")
 
     if to_classify:
-        classified, failed = 0, 0
-        it = tqdm(to_classify, desc="NPClassifier") if HAS_TQDM else to_classify
+        # Batched inference instead of one-by-one
+        batch_smiles = [smiles_list[idx] for idx in to_classify]
+        batch_results = clf.classify_batch_raw(batch_smiles)
 
-        for idx in it:
+        classified, failed = 0, 0
+        for j, idx in enumerate(to_classify):
             smi = smiles_list[idx]
-            result = clf.classify_one(smi)
+            result = batch_results[j]
             if "error" in result:
                 failed += 1
             else:
@@ -436,13 +477,15 @@ def classify_batch_full(smiles_list, cache_dir=".", repo_root=None, **kwargs):
     print(f"  Cache hits: {cached_hits:,}, to classify: {len(to_classify):,}")
 
     if to_classify:
-        it = tqdm(to_classify, desc="NPClassifier") if HAS_TQDM else to_classify
-        for idx in it:
-            smi = smiles_list[idx]
-            result = clf.classify_one(smi)
+        # Batched inference
+        batch_smiles = [smiles_list[idx] for idx in to_classify]
+        batch_results = clf.classify_batch_raw(batch_smiles)
+
+        for j, idx in enumerate(to_classify):
+            result = batch_results[j]
             per_molecule[idx] = result
             if "error" not in result:
-                cache[smi] = result
+                cache[smiles_list[idx]] = result
 
     _save_cache(cache, cache_path)
 
