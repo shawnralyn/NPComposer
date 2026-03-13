@@ -1,24 +1,27 @@
 """
 Row-wise binning of QED (0-1 by 0.1) and SA (1-10 by 1.0) for downstream tokenization. 
-Adds 'qed_bin' and 'sa_bin' columns, using a per-row loop keyed by index.
+Adds 'qed_bin' and 'sa_bin' columns to COCONUT input csv using a per-row loop keyed by index.
 """
 
 import argparse
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 
-def define_bins():
-    """
-    Define bins and labels for QED and SA scores
+def define_bins() -> Tuple[np.ndarray, List[str], np.ndarray, List[str]]:
+    """Define bins and labels for QED and SA scores.
+
+    Creates bin edges and human-readable labels for QED (0.0 to 1.0, step 0.1)
+    and SA (1.0 to 10.0, step 1.0) scores.
 
     Returns:
-        tuple: (qed_bins, qed_labels, sa_bins, sa_labels)
-            - qed_bins (np.ndarray): Bins for QED scores (from 0.0 to 1.0, step 0.1).
-            - qed_labels (list of str): Labels for each QED bin, e.g. '0<=qed<0.1'.
-            - sa_bins (np.ndarray): Bins for SA scores (from 1.0 to 10.0, step 1.0).
-            - sa_labels (list of str): Labels for each SA bin, e.g. '1<=sa<2'.
+        Tuple[np.ndarray, List[str], np.ndarray, List[str]]: A tuple containing:
+            - qed_bins (np.ndarray): Bin edges for QED scores.
+            - qed_labels (List[str]): Labels for each QED bin, e.g. '0<=qed<0.1'.
+            - sa_bins (np.ndarray): Bin edges for SA scores.
+            - sa_labels (List[str]): Labels for each SA bin, e.g. '1<=sa<2'.
     """
 
     # create QED bins
@@ -38,20 +41,27 @@ def define_bins():
     return qed_bins, qed_labels, sa_bins, sa_labels
 
 
-def bin_row(qed_val, sa_val, qed_bins, qed_labels, sa_bins, sa_labels):
-    """
-    Assigns bin labels to a single row's QED and SA values.
+def bin_row(
+    qed_val: Optional[float],
+    sa_val: Optional[float],
+    qed_bins: np.ndarray,
+    qed_labels: List[str],
+    sa_bins: np.ndarray,
+    sa_labels: List[str]
+) -> Dict[str, Optional[str]]:
+    """Assign bin labels to a single row's QED and SA values.
 
-    inputs:
-        qed_val (float or None): The QED score for the row 
-        sa_val (float or None): The SA score for the row 
-        qed_bins (np.ndarray): Array of bins for QED
-        qed_labels (list of str): Labels for each QED bin
-        sa_bins (np.ndarray): Array of bins for SA
-        sa_labels (list of str): Human-readable labels for each SA bin
+    Args:
+        qed_val (Optional[float]): The QED score for the row, or None if missing.
+        sa_val (Optional[float]): The SA score for the row, or None if missing.
+        qed_bins (np.ndarray): Array of bin edges for QED.
+        qed_labels (List[str]): Labels for each QED bin.
+        sa_bins (np.ndarray): Array of bin edges for SA.
+        sa_labels (List[str]): Labels for each SA bin.
 
-    outputs:
-        dict: Dictionary containing 'qed_bin' and 'sa_bin' (e.g., {"qed_bin": <label|None>, "sa_bin": <label|None>})
+    Returns:
+        Dict[str, Optional[str]]: Dictionary with keys 'qed_bin' and 'sa_bin',
+            each mapping to a bin label string or None if the value was missing.
     """
 
     # qed drug likeliness
@@ -68,11 +78,12 @@ def bin_row(qed_val, sa_val, qed_bins, qed_labels, sa_bins, sa_labels):
         bin_idx = np.digitize(qed, qed_bins) - 1
 
         # get the label for this bin, or None if out of range
-        qed_bin = qed_labels[bin_idx] if 0 <= bin_idx < len(qed_labels) else None
+        qed_bin = qed_labels[bin_idx] if 0 <= bin_idx < len(
+            qed_labels) else None
 
     # synthetic accessibility (SA)
     if sa_val is None or (isinstance(sa_val, float) and np.isnan(sa_val)):
-        sa_bin = None 
+        sa_bin = None
     else:
         sa = float(sa_val)
 
@@ -80,27 +91,43 @@ def bin_row(qed_val, sa_val, qed_bins, qed_labels, sa_bins, sa_labels):
             sa = sa_bins[-1] - 1e-8
 
         bin_idx = np.digitize(sa, sa_bins) - 1
-        
+
         sa_bin = sa_labels[bin_idx] if 0 <= bin_idx < len(sa_labels) else None
 
     # return dict with bin labels for row
     return {"qed_bin": qed_bin, "sa_bin": sa_bin}
 
 
-def main():
+def main() -> None:
+    """Bin QED and SA scores in a COCONUT database CSV.
+
+    Reads the input CSV, bins 'qed_drug_likeliness' and 'sa_score' columns into
+    discrete ranges, adds 'qed_bin' and 'sa_bin' columns, and writes the result
+    to an output CSV.
+
+    Command-line Arguments:
+        --input_csv (str): Path to input COCONUT CSV with 'qed_drug_likeliness'
+            and 'sa_score' columns.
+        --output (str): Path to output CSV with added 'qed_bin' and 'sa_bin' columns.
+
+    Raises:
+        ValueError: If required columns are missing from the input CSV.
+    """
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input_csv", required=True, help="Path to COCONUT CSV with added SA scores")
-    ap.add_argument("--output", required=True, help="Path to updated COCONUT CSV with binned QED and SA values")
+    ap.add_argument("--input_csv", required=True,
+                    help="Path to COCONUT CSV with added SA scores")
+    ap.add_argument("--output", required=True,
+                    help="Path to updated COCONUT CSV with binned QED and SA values")
     args = ap.parse_args()
 
     df = pd.read_csv(args.input_csv)
 
     # check df for required columns
-    required_cols = ['qed_drug_likeliness','sa_score']
+    required_cols = ['qed_drug_likeliness', 'sa_score']
     missing = [col for col in required_cols if col not in df.columns]
     if missing:
         raise ValueError(f"Missing required column(s): {', '.join(missing)}")
-    
+
     # drop rows missing QED, SA score values
     df = df.dropna(subset=required_cols)
 
@@ -120,7 +147,9 @@ def main():
         binned[idx] = res
 
     binned_df = pd.DataFrame.from_dict(binned, orient="index")
-    df = df.join(binned_df) # join binned df with original df to add qed_bin and sa_bin columns
+
+    # join binned df with original df to add qed_bin and sa_bin columns
+    df = df.join(binned_df)
 
     df.to_csv(args.output)
 

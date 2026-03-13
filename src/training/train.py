@@ -3,7 +3,7 @@ import argparse
 import yaml
 import pandas as pd
 import random
-from typing import Any, Dict
+from typing import Any, Dict, IO, List, Optional, Tuple
 import torch
 from datasets import Dataset
 import sys
@@ -17,23 +17,50 @@ from transformers import (
 
 # filter 'fast_transformers' warning in stdout
 class LineFilterStream:
-    def __init__(self, stream, banned_substrings):
+    def __init__(self, stream: IO[str], banned_substrings: List[str]) -> None:
+        """
+        Stream wrapper to filter lines containing banned substrings.
+
+        Args:
+            stream (IO[str]): The original stream to wrap.
+            banned_substrings (List[str]): Substrings to filter out from output.
+        """
         self.stream = stream
         self.banned = banned_substrings
-    def write(self, s):
+
+    def write(self, s: str) -> Optional[int]:
+        """
+        Write string to stream unless it contains a banned substring.
+
+        Args:
+            s (str): String to write.
+
+        Returns:
+            Optional[int]: Result of stream write, or None if filtered.
+        """
         if any(b in s for b in self.banned):
             return
         return self.stream.write(s)
-    def flush(self):
+
+    def flush(self) -> None:
+        """
+        Flush the wrapped stream.
+        """
         return self.stream.flush()
 
 sys.stdout = LineFilterStream(sys.stdout, ["No module named 'fast_transformers'"])
 sys.stderr = LineFilterStream(sys.stderr, ["No module named 'fast_transformers'"])
 
 
-def parse_yaml(yml):
+def parse_yaml(yml: str) -> Optional[Dict[str, Any]]:
     """
     Read in yaml configuration file
+
+    Args:
+        yml (str): Path to YAML file.
+
+    Returns:
+        Optional[Dict[str, Any]]: Parsed YAML configs or None if error.
     """
     try:
         with open(yml, "r") as file:
@@ -46,14 +73,14 @@ def parse_yaml(yml):
 
 
 def build_special_class_tokens(
-    ds_train,
-    pathway_col,
-    superclass_col,
-    is_glycoside_col,
-    num_aromatic_rings_col,
-    qed_bin_col,
-    sa_bin_col
-):
+    ds_train: str,
+    pathway_col: str,
+    superclass_col: str,
+    is_glycoside_col: str,
+    num_aromatic_rings_col: str,
+    qed_bin_col: str,
+    sa_bin_col: str
+) -> Dict[str, List[str]]:
     """
     Creates special class tokens for each value in each class column and returns dictionary to update tokenizer vocabulary
 
@@ -66,6 +93,18 @@ def build_special_class_tokens(
 
     additional:
         - special tokens are added so that they won't be split during tokenization
+
+    Args:
+        ds_train (str): CSV path of COCONUT database (train split).
+        pathway_col (str): Column name for pathway.
+        superclass_col (str): Column name for superclass.
+        is_glycoside_col (str): Column name for glycoside.
+        num_aromatic_rings_col (str): Column name for aromatic rings count.
+        qed_bin_col (str): Column name for QED bin.
+        sa_bin_col (str): Column name for SA bin.
+
+    Returns:
+        Dict[str, List[str]]: Dict containing special tokens to add to tokenizer.
     """
     train_df = pd.read_csv(ds_train)
     special_tokens = set()
@@ -87,7 +126,11 @@ def build_special_class_tokens(
     return special_tokens_dict
 
 
-def update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict):
+def update_tokenizer_with_special_tokens(
+    model: Any,
+    tokenizer: Any,
+    special_tokens_dict: Dict[str, List[str]]
+) -> Tuple[Any, Any]:
     """
     Updates tokenizer vocabulary with special tokens and resizes model embedding matrix to match tokenizer vocabulary
     size
@@ -101,6 +144,14 @@ def update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict):
         -model: Transformer model with resized embedding matrix to match tokenizer vocabulary size after addition of
         special tokens
         -tokenizer: Tokenizer with updated vocabulary including special tokens
+
+    Args:
+        model: Loaded transformer model to be fine-tuned.
+        tokenizer: Tokenizer associated with transformer model.
+        special_tokens_dict (Dict[str, List[str]]): Dict of special class tokens.
+
+    Returns:
+        Tuple[Any, Any]: Updated model and tokenizer.
     """
 
     # add special tokens dict to tokenizer vocabulary
@@ -116,7 +167,7 @@ def update_tokenizer_with_special_tokens(model, tokenizer, special_tokens_dict):
 
 def dataframe_to_tokenized_dataset(
     df: pd.DataFrame,
-    tokenizer,
+    tokenizer: Any,
     smiles_col: str,
     pathway_col: str,
     superclass_col: str,
@@ -130,6 +181,22 @@ def dataframe_to_tokenized_dataset(
     """
     Convert a pandas DataFrame with SMILES + class columns into a Hugging Face Dataset
     that contains tokenized fields ready for training.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing data.
+        tokenizer: Tokenizer for tokenizing text.
+        smiles_col (str): Column name for SMILES.
+        pathway_col (str): Column name for pathway.
+        superclass_col (str): Column name for superclass.
+        is_glycoside_col (str): Column name for glycoside.
+        num_aromatic_rings_col (str): Column name for aromatic rings count.
+        qed_bin_col (str): Column name for QED bin.
+        sa_bin_col (str): Column name for SA bin.
+        max_len (int): Maximum token length.
+        filter_len (int, optional): Filter out rows exceeding this token length. Defaults to 200.
+
+    Returns:
+        Dataset: Tokenized Hugging Face Dataset.
     """
     # Ensure all columns exist
     for col in [smiles_col, pathway_col, superclass_col, is_glycoside_col, num_aromatic_rings_col, qed_bin_col, sa_bin_col]:
@@ -191,7 +258,11 @@ def dataframe_to_tokenized_dataset(
     return ds
 
 
-def conditioning_dropout_collator(tokenizer, special_token_dropout_prob, drop_all_special_tokens_prob):
+def conditioning_dropout_collator(
+    tokenizer: Any,
+    special_token_dropout_prob: float,
+    drop_all_special_tokens_prob: float
+) -> Any:
     """
     The data collator takes a batch of tokenized inputs and processes them to produce tensors 
     ready for input to the model during training and evaluation. 
@@ -203,6 +274,14 @@ def conditioning_dropout_collator(tokenizer, special_token_dropout_prob, drop_al
 
     Assumptions:
     - conditioning tokens are in tokenizer.additional_special_tokens
+
+    Args:
+        tokenizer: Tokenizer for token IDs.
+        special_token_dropout_prob (float): Probability to drop each special token.
+        drop_all_special_tokens_prob (float): Probability to drop all special tokens.
+
+    Returns:
+        Any: Data collator function.
     """
 
     pad_to_batch = DataCollatorWithPadding(tokenizer) # load base data collator
@@ -212,7 +291,7 @@ def conditioning_dropout_collator(tokenizer, special_token_dropout_prob, drop_al
         tokenizer.convert_tokens_to_ids(tokenizer.additional_special_tokens)
     )
 
-    def data_collator(batch_smiles):
+    def data_collator(batch_smiles: List[Dict[str, Any]]) -> Dict[str, Any]:
         # enable stochastic conditioning label dropout only during training when .is_grad_enabled() == True
         enable_dropout = torch.is_grad_enabled() and (special_token_dropout_prob > 0 or drop_all_special_tokens_prob > 0) 
 
@@ -256,7 +335,7 @@ def conditioning_dropout_collator(tokenizer, special_token_dropout_prob, drop_al
     return data_collator
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--yaml", required=True, help="Training yaml configuration file")
     ap.add_argument("--train_csv", required=True, help="Path to training split CSV")
@@ -371,8 +450,8 @@ def main():
         # Eval/save
         eval_strategy=configs["training"]["evaluation_strategy"],
         save_strategy=configs["training"]["save_strategy"],
-	    save_safetensors=False,
-	    metric_for_best_model=configs["training"]["metric_for_best_model"],
+        save_safetensors=False,
+        metric_for_best_model=configs["training"]["metric_for_best_model"],
         greater_is_better=bool(configs["training"]["greater_is_better"]),
         logging_steps=int(configs["training"]["logging_steps"]),
         save_total_limit=int(configs["training"]["save_total_limit"]),
