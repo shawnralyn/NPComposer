@@ -2,7 +2,7 @@
 
 NPComposer is a SMILES-based molecular generation language model enabling controllable generation of diverse natural product (NP) molecules. 
 
-![NPComposer Figure](docs/np_composer_figure.png)
+![NPComposer Figure](docs/npcomposer_figure.png)
 
 NPComposer was trained through fine-tuning of [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) - a 46.8M parameter transformer decoder model - on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
 
