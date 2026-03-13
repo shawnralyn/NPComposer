@@ -6,7 +6,7 @@ from rdkit.Contrib.SA_Score import sascorer
 tok = AutoTokenizer.from_pretrained("ralyn/NPComposer-v2", trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained("ralyn/NPComposer-v2", trust_remote_code=True).eval()
 
-x = tok("<np_classifier_pathway:Terpenoids>", return_tensors="pt", add_special_tokens=False)
+x = tok("<np_classifier_superclass:Chromanes>", return_tensors="pt", add_special_tokens=False)
 y = model.generate(**x, max_new_tokens=200, do_sample=True, top_p=0.95, temperature=0.85)
 
 filtered_tok = tok.decode(y[0], skip_special_tokens=True).split(".")[0]

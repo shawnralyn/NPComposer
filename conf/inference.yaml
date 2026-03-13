@@ -5,4 +5,4 @@ inference:
   top_p: 0.95
   temperature: 1.0
   seed: 42
-  np_class: "<np_classifier_pathway:Alkaloids> <np_classifier_superclass:Tryptophan alkaloids>"
+  np_class: "<np_classifier_pathway:Polyketides>"

@@ -60,3 +60,4 @@ src/training/wandb/
 
 # files
 V2.txt
+*.json

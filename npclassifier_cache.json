@@ -71995,5 +71995,496 @@
     "superclass_all": [],
     "class_all": [],
     "isglycoside": false
+  },
+  "CC[C@@H](C)[C@H](NC(=O)N1CCC2=C(NC=N2)C1C1=CC(OC)=CC(OC)=C1)C(=O)OCC1=CC=CC=C1OCC(=O)OCC1=CC=CC=C1Cl": {
+    "pathway": "Alkaloids",
+    "superclass": "Nicotinic acid alkaloids",
+    "class_": "Pyridine alkaloids",
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Nicotinic acid alkaloids"
+    ],
+    "class_all": [
+      "Pyridine alkaloids"
+    ],
+    "isglycoside": false
+  },
+  "CC1=CC=C2C(=C1)NC1(CCN(S(=O)(=O)C3=CC=CC(C#N)=C3)CC1)C1=CC=CN21": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=CC2=C3C=CC(=O)N4CCC5=CC6=C(C=C5C(=C43)C=C2C(OC)=C1OC)C1=C(C6=O)N(C)CCC1OC(C)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=CC=C2NC3=C(CCN4C(=O)N([C@@H](C)C(=O)NCCC5=CCCCC5)C(=O)[C@]34C)C2=C1OC": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=C(C(=O)CC2=CN(C)C3=CC=CC=C23)NC2=CC=CC=C12": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=CC=C2NC3=C(CCCC3NC(=O)CN3N=CC(Br)=NC3=O)C2=C1OC": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=CC=C2C(=C1)C1=C3[C@H](CCC1)N([C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O)CCN32": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": true
+  },
+  "COC1=CC=C2C(=C1OC)C(=O)N1[C@H]2C2=C(C[C@H]1C(=O)O)C1=CC=CC=C1N2C(C)C": {
+    "pathway": "Alkaloids",
+    "superclass": "Nicotinic acid alkaloids",
+    "class_": "Pyridine alkaloids",
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Nicotinic acid alkaloids"
+    ],
+    "class_all": [
+      "Pyridine alkaloids"
+    ],
+    "isglycoside": false
+  },
+  "CC1(C)C2=C(C[C@H]3C(=O)N(/N=C/C4=CC=CC=C4)CC(=O)N31)C1=CC=CC=C1N2CC1=CC=CC=C1Cl": {
+    "pathway": "Alkaloids",
+    "superclass": "Pseudoalkaloids",
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Pseudoalkaloids"
+    ],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=C(OC)C(OC)=C2C3=C1CCNC3=CC1=CC=CC=C12": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1(C)[C@@H](O)CC[C@]2(C)[C@H]3C(=O)C=C4[C@@H]5C[C@@](C)(C(=O)O)CC[C@]5(C)CC[C@@]4(C)[C@]3(C)CC[C@@H]12": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "C[C@H]1CC[C@@]2(OC1)O[C@H]1C[C@@H]3[C@H]4CCC5=C[C@@H](O)CC[C@]5(C)[C@@H]4CC[C@]3(C)[C@H]1[C@@H]2C": {
+    "pathway": "Alkaloids",
+    "superclass": "Pseudoalkaloids",
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Pseudoalkaloids"
+    ],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1(C)C[C@H]2C3=CC[C@@H]4[C@@]5(C)CC[C@H](O)[C@](C)(CO)[C@@H]5CC[C@@]4(C)[C@]3(C)C[C@@H](O)[C@@]2(CO)[C@@H](O)[C@@H]1O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1OCCO[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1OCC": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": true
+  },
+  "COC1=CC=C(C(=O)O[C@H]2C[C@@]3(C)O[C@@H]3[C@H](O)[C@]3(C)[C@@H]2[C@](C)(C2CC[C@@](C)(OC(C)=O)C2)CC[C@@H]3O)C=C1OC(C)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=CC(=O)OC[C@@]23CCC(C)=C[C@H]2O[C@@H]2C[C@@H](OC(=O)/C=C\\C=C[C@H]([C@@H](C)O)OCC1)[C@@]3(C)[C@]21CO1": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=C(O)C=C(C(=O)O)C=C1O[C@@H]1O[C@@H](CO)[C@@H](O)[C@@H](O)[C@H]1O[C@H]1OC[C@](O)(CO)[C@H]1OC(=O)C1=CC(OC)=C(O)C(OC)=C1OC(=O)C1=CC(OC)=C(OC)C(OC)=C1OC(C)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": true
+  },
+  "CCC(=O)OCC(=O)[C@@]1(OC(C)=O)CC[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@H]3[C@@H](O)C[C@@]21COC(C)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "C=C(C)[C@H](O)CC[C@@H](COS(=O)(=O)[O-])[C@H]1CCC2C3CC[C@H]4[C@H](O)[C@@H](OS(=O)(=O)[O-])CC[C@]4(C)C3CC[C@@]21C": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCCCCCCCCCCCCC(=O)OC/C=C\\C(=O)OC/C=C(\\C)CC[C@@]1(C)[C@H](C)CC[C@@]2(C)C(C)=CCC[C@@H]12": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCCCCCCCCCCCCOC(=O)[C@H](C)CCC[C@H](C)[C@@H]1CC[C@@H](CC(=O)OCC)O1": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC(=O)OC1=CC=C(N2C(=O)[C@@H]3[C@H](CC(N)=O)N[C@]4(C(=O)NC5=C4C=CC(Cl)=C5C)[C@@H]3C2=O)C=C1OC(C)C(=O)OC(C)(C)C(=O)OCC(N)=O": {
+    "pathway": "Polyketides",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Polyketides"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCC1=CC2=C(C=C1OCC1=CC=C(C(=O)OC)O1)OC(C)=C(C1=CC=C3OCCOC3=C1)C2=O": {
+    "pathway": "Polyketides",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Polyketides"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=CC(O)=C2C(=O)C=C(O)C=C2O1": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "C1=CC=C(C2=NN=C([C@H]3CCN(CC4=CN=C5C=CC=CC5=C4)C3)O2)C=C1": {
+    "pathway": "Alkaloids",
+    "superclass": "Pseudoalkaloids",
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Pseudoalkaloids"
+    ],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=CC(=O)C2=C(C)C=C3C=C(O)C=C(O)C3=C2O1": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=CC(C2=CC(=O)C3=C(O)C([C@@H]4C[C@H](O)[C@H](O)[C@H](C)O4)=C(O)C=C3O2)=CC(O)=C1OC(C)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=C(C2=CC=C3OCCCCOC3=C2)C(=O)C2=CC=C(OCC(=O)C(C)C)C=C2O1": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "COC1=C(O)C=C(C)C2=C1OC1=C3C(=CC(O)=C1C2=O)OC(C)(C)[C@H](OC(C)=O)C3CC(C)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCC(=O)C1=C(C)C2=CC3=C(OC(C)(CCC=C(C)C)C(C)=C3C(=O)O)C(C)=C2O1": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCOC1=C(C2=NC3=CC(NC(=O)C4CCCC4)=CC=C3N2C)N(C)C=C1C(N)=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCC1=CC2=C(C=C1OC(C)=O)OC=C(C1=CC=C3OCCOC3=C1)C2=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids",
+      "Polyketides"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCCCCC1=C(C)C2=CC=C(OCC(=O)OC(C)C)C(C)=C2OC1=O": {
+    "pathway": "Alkaloids",
+    "superclass": "Pseudoalkaloids",
+    "class_": "Azo and Azoxy alkaloids",
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Pseudoalkaloids"
+    ],
+    "class_all": [
+      "Azo and Azoxy alkaloids"
+    ],
+    "isglycoside": false
+  },
+  "CCCCCCCCCCCCCCCCCC(=O)O[C@H]1CC(C)(C)[C@]2(CC(=O)/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(C)/C=C/C3=C(C)CC(O)CC3(C)C)O[C@]2(C)C1=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC1=C(/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(C)/C=C/C2=C(C)[C@H](O)[C@H](O)CC2(C)C)C(C)(C)C[C@@H](O)C1=O": {
+    "pathway": "Alkaloids",
+    "superclass": "Pseudoalkaloids",
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Pseudoalkaloids"
+    ],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "C1=CC(=C(C2=CC=CC=C2)C2=CC=CC=C2)C(C2=CC=CC=C2)=C1C1=CC=CC=C1": {
+    "pathway": "Alkaloids",
+    "superclass": "Anthranilic acid alkaloids",
+    "class_": "Anthranillic acid derivatives",
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Anthranilic acid alkaloids"
+    ],
+    "class_all": [
+      "Anthranillic acid derivatives"
+    ],
+    "isglycoside": false
+  },
+  "C1=CC(=C2CC(=O)OC3=C2C(=O)OC(C)=C3)C=CC1=O": {
+    "pathway": "Polyketides",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Polyketides"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@H]1CC[C@@]2(C)C(=CC[C@H]3[C@@]4(C)CC[C@H]([C@H](C)CCC[C@H](CC)C(C)C)[C@@]4(C)CC[C@]32C)C1=O": {
+    "pathway": "Alkaloids",
+    "superclass": "Tyrosine alkaloids",
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Tyrosine alkaloids"
+    ],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "C(/C=C/C=C(C)/C=C/C=C(\\C)CCC(O)C(C)(C)O)=C\\C=C\\C=C(C)\\C=C\\C=C(C)\\C=C\\C=C(C)\\C=C\\[C@H](O)C(C)(C)O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@H](O)[C@H](O)[C@H]1O[C@@H]1O[C@@H](C)[C@H](O)[C@@H](O)[C@H]1O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1OC[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": true
+  },
+  "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC(=O)OC1CCCC(C(C)(CCCC(C)CCCC(C)CCCC(C)C)OC(=O)C(C)C2CCC3OC3(C)C2CCC(C)CCCC(C)CCCC(C)CCCC(C)C)OC1CCC(C)CCCC(C)CCCC(C)CCCC(C)CCCCC(C)CCCCC(C)CCCC(C)CCCCC(C)CCCCCC(C)C": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "C(=CC1C(C)(C=C(C)C)C(C)=C(C=CC2=CC=C(O)C(O)=C2)C1(C)C)C1=C(C)C(=O)C2=C(O)C=CC(O)=C2C1=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CCCCCCCCCCCCCCCC(=O)O[C@H]1CC(C)=C(/C=C/C(C)=C/C=C/C(C)=C/C=C/C=C(C)/C=C/C=C(C)/C=C/[C@H]2C(C)=C[C@H](OC(=O)CCCCCCCCCCCCC)CC2(C)C)C(C)(C)C1=O": {
+    "pathway": "Alkaloids",
+    "superclass": null,
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [],
+    "class_all": [],
+    "isglycoside": false
+  },
+  "CC(=C\\C=C\\C(C)=C\\C=C\\C=C(/C)C(=O)[C@@]1(C)C[C@@H](O)CC1(C)C)/C=C/C=C(/C)C[C@@H](C)[C@H]1OC(=O)C[C@H]1COC(=O)/C=C/C1=C(C)C[C@@H](O)CC1(C)C": {
+    "pathway": "Alkaloids",
+    "superclass": "Pseudoalkaloids",
+    "class_": null,
+    "pathway_all": [
+      "Alkaloids"
+    ],
+    "superclass_all": [
+      "Pseudoalkaloids"
+    ],
+    "class_all": [],
+    "isglycoside": false
   }
 }
