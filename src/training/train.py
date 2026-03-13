@@ -84,16 +84,6 @@ def build_special_class_tokens(
     """
     Creates special class tokens for each value in each class column and returns dictionary to update tokenizer vocabulary
 
-    inputs:
-        - ds_train: csv path of COCONUT database (train split)
-        - pathway_col, superclass_col, ...: column names specifying natural product classes
-
-    outputs:
-        - special_tokens_dict (dict): Dict containing special tokens specifying natural product class to add to tokenizer
-
-    additional:
-        - special tokens are added so that they won't be split during tokenization
-
     Args:
         ds_train (str): CSV path of COCONUT database (train split).
         pathway_col (str): Column name for pathway.
@@ -134,16 +124,6 @@ def update_tokenizer_with_special_tokens(
     """
     Updates tokenizer vocabulary with special tokens and resizes model embedding matrix to match tokenizer vocabulary
     size
-
-    inputs:
-        -model: Loaded transformer model to be fine-tuned
-        -tokenizer: Tokenizer associated with transformer model
-        -special_tokens_dict (dict): Dictionary formatted to add special class tokens to tokenizer vocabulary
-
-    outputs:
-        -model: Transformer model with resized embedding matrix to match tokenizer vocabulary size after addition of
-        special tokens
-        -tokenizer: Tokenizer with updated vocabulary including special tokens
 
     Args:
         model: Loaded transformer model to be fine-tuned.
