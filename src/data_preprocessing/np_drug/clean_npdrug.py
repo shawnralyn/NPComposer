@@ -1,7 +1,4 @@
 """Clean and process NP-Drug Excel file into a structured CSV.
-
-TODO: add extra columns (from RDKIT) from the target molecule
-and add some variabity to be used as inputs.
 """
 
 import argparse
@@ -44,8 +41,8 @@ def filter_and_rename(df):
     ]
 
     df = df[["Generic Name", "SMILES", "Parent Natural Product"]].rename(columns={
-        "Generic Name": "generic_name",
-        "SMILES": "smiles",
+        "Generic Name": "drug_name",
+        "SMILES": "drug_smiles",
         "Parent Natural Product": "parent_np_name",
     }).reset_index(drop=True)
 
@@ -102,11 +99,11 @@ def clean_npdrug(input_path, output_path):
     print(f"  {len(df):,} rows after filtering")
 
     print("Canonicalizing SMILES...")
-    df["smiles"] = df["smiles"].apply(canonicalize_smiles)
-    n_invalid = df["smiles"].isna().sum()
+    df["drug_smiles"] = df["drug_smiles"].apply(canonicalize_smiles)
+    n_invalid = df["drug_smiles"].isna().sum()
     if n_invalid:
         print(f"  Warning: {n_invalid} invalid SMILES dropped")
-    df = df.dropna(subset=["smiles"]).reset_index(drop=True)
+    df = df.dropna(subset=["drug_smiles"]).reset_index(drop=True)
     print(f"  {len(df):,} rows with valid SMILES")
 
     print("Looking up parent NP SMILES from PubChem...")
