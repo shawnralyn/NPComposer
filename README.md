@@ -4,7 +4,7 @@ NPComposer is a SMILES-based molecular generation language model enabling contro
 
 ![NPComposer Figure](docs/npcomposer_figure.png)
 
-NPComposer was trained through fine-tuning of [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) - a 46.8M parameter transformer decoder model - on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
+NPComposer was trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) - a 46.8M parameter transformer decoder foundation model - on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
 
 By providing class labels and molecular property information as special tokens during model fine-tuning, NPComposer allows for conditional natural product generation based on: 
 - NP biosynthesis pathway (i.e. terpenoid, polyketide, alkaloid, etc.)
