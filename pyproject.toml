@@ -35,5 +35,9 @@ dev = [
     "pytest>=7.0.0"
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["external", "outputs", "data", ".git"]
+
 [tool.setuptools.packages.find]
 include = ["tests*"]

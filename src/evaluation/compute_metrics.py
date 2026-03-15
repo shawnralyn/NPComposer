@@ -58,7 +58,7 @@ def npclassifier_classify(
     cached: bool = True,
     timeout: int = 30,
     max_retries: int = 3,
-    sleep_s: float = 0.05,
+    sleep_s: float = 3.0,
 ) -> dict:
     if not HAS_REQUESTS:
         return {"error": "requests not installed"}

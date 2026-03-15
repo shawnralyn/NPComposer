@@ -18,8 +18,6 @@ TOP=0
 SEEDS="1 2 3"
 NUM_MOLECULES=10
 YAML="conf/inference.yaml"
-TRAINING_DATA="data/raw/coconut_csv_full.csv"    # full COCONUT for uniqueness
-NOVELTY_REF="data/processed/coconut_5000.csv"      # K-means subset for novelty
 OUTPUT_DIR="outputs/Shawn_model1/evaluation_optimal"
 SUPERCLASSES=""
 PATHWAY=""
@@ -33,8 +31,6 @@ while [[ $# -gt 0 ]]; do
         --seeds) SEEDS="$2"; shift 2 ;;
         --num) NUM_MOLECULES=$2; shift 2 ;;
         --yaml) YAML=$2; shift 2 ;;
-        --training) TRAINING_DATA=$2; shift 2 ;;
-        --novelty_ref) NOVELTY_REF=$2; shift 2 ;;
         --output) OUTPUT_DIR=$2; shift 2 ;;
         --superclasses) SUPERCLASSES="$2"; shift 2 ;;
         --pathway) PATHWAY="$2"; shift 2 ;;
@@ -145,19 +141,6 @@ echo "  Output: $OUTPUT_DIR"
 [ -n "$PATHWAY" ] && echo "  Pathway filter: $PATHWAY"
 echo ""
 
-# Flags
-TRAIN_FLAG=""
-NOV_FLAG=""
-if [ -f "$TRAINING_DATA" ]; then
-    TRAIN_FLAG="--training $TRAINING_DATA"
-fi
-if [ -f "$NOVELTY_REF" ]; then
-    NOV_FLAG="--novelty_ref $NOVELTY_REF"
-fi
-
-NP_FLAG=""
-[ -n "$NP_CLASSIFIER_ROOT" ] && NP_FLAG="--np_root $NP_CLASSIFIER_ROOT"
-
 EXTRA_FLAGS="--sa_bin $SA_BIN --qed_bin $QED_BIN"
 [ -n "$PATHWAY" ] && EXTRA_FLAGS="$EXTRA_FLAGS --pathway $PATHWAY"
 
@@ -180,10 +163,10 @@ for SC_NAME in "${CLASS_LIST[@]}"; do
             --num_molecules "$NUM_MOLECULES"
 
         echo "  Seed $SEED: evaluating ..."
-        python3 src/evaluation/metrics.py \
+        python3 src/evaluation/compute_metrics.py \
             -i "$OUT_FILE" \
             -o "$RESULT_FILE" \
-            $NP_FLAG $TRAIN_FLAG $NOV_FLAG
+            --npclassify
 
         echo "  Seed $SEED: done -> $RESULT_FILE"
     done
@@ -209,18 +192,6 @@ def load_results(d):
 
 avg = lambda xs: sum(xs)/len(xs) if xs else 0
 
-def get_uniq(r):
-    u = r.get('uniqueness', {})
-    if isinstance(u, dict):
-        return u.get('uniqueness', 0) * 100
-    return u * 100
-
-def get_nov(r):
-    n = r.get('novelty', {})
-    if isinstance(n, dict):
-        return n.get('novelty', 0) * 100
-    return n * 100
-
 opt = load_results('$OUTPUT_DIR')
 base_dir = 'outputs/Shawn_model1/evaluation'
 has_base = os.path.isdir(base_dir) and glob.glob(os.path.join(base_dir, '*_results.json'))
@@ -230,7 +201,7 @@ if not opt:
     print('No result files found.')
     exit()
 
-header = f\"{'Superclass':<40} {'Valid%':>7} {'SA':>7} {'QED':>7} {'Div':>7} {'Uniq%':>7} {'Nov%':>7}\"
+header = f\"{'Superclass':<40} {'Valid%':>7} {'SA':>7} {'QED':>7} {'Div':>7}\"
 if has_base:
     header += f\"  || base: {'V%':>6} {'SA':>7} {'QED':>7}\"
 print(header)
@@ -241,10 +212,8 @@ for cls, runs in sorted(opt.items()):
     sas = [r['sa_score']['mean'] for r in runs]
     qeds = [r['qed']['mean'] for r in runs]
     divs = [r['internal_diversity']['mean'] if isinstance(r.get('internal_diversity'), dict) else r.get('internal_diversity', 0) for r in runs]
-    uniqs = [get_uniq(r) for r in runs]
-    novs = [get_nov(r) for r in runs]
 
-    line = f'{cls:<40} {avg(vals):>6.1f}% {avg(sas):>6.2f} {avg(qeds):>6.3f} {avg(divs):>6.3f} {avg(uniqs):>6.1f}% {avg(novs):>6.1f}%'
+    line = f'{cls:<40} {avg(vals):>6.1f}% {avg(sas):>6.2f} {avg(qeds):>6.3f} {avg(divs):>6.3f}'
 
     if has_base and cls in base:
         b = base[cls]
@@ -264,8 +233,6 @@ for cls, runs in opt.items():
         'sa_mean': sum(r['sa_score']['mean'] for r in runs)/n,
         'qed_mean': sum(r['qed']['mean'] for r in runs)/n,
         'diversity_mean': avg([r['internal_diversity']['mean'] if isinstance(r.get('internal_diversity'), dict) else r.get('internal_diversity', 0) for r in runs]),
-        'uniqueness_mean': avg([get_uniq(r)/100 for r in runs]),
-        'novelty_mean': avg([get_nov(r) for r in runs]),
         'conditioning': {'sa_bin': '$SA_BIN', 'qed_bin': '$QED_BIN'},
     }
 with open(os.path.join('$OUTPUT_DIR', 'summary.json'), 'w') as f:
