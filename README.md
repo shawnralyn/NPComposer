@@ -1,15 +1,26 @@
 # NPComposer
 
-NPComposer is a SMILES-based molecular generation language model enabling controllable generation of diverse natural product (NP) molecules.
+A platform for training, evaluating, and comparing SMILES-based language models for natural product (NP) molecular generation. This project integrates multiple generative models with a unified evaluation pipeline, RL fine-tuning framework, and automated tooling for molecular analysis.
+
+
+## Main Models
+
+### NPComposer
 
 ![NPComposer Figure](docs/npcomposer_figure.png)
 
-NPComposer was trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) — a 46.8M parameter transformer decoder foundation model — on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
+NPComposer is a conditional molecular generation model trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) — a 46.8M parameter transformer decoder foundation model — on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
 
 By providing class labels and molecular property information as special tokens during model fine-tuning, NPComposer allows for conditional natural product generation based on: NP biosynthesis pathway (7 pathways including Alkaloids, Terpenoids, Shikimates and Phenylpropanoids, etc.), NP superclass (100+ superclasses), presence or absence of glycoside, number of aromatic rings (0–22), QED drug-likeness (0–1), and synthetic accessibility score (1–10).
 
+### NPGPT-RL
 
-## Model & Checkpoints
+![NPGPT-RL Pipeline](docs/npgpt_rl_pipeline.png)
+
+NPGPT-RL is an RL-finetuned version of [NPGPT](https://github.com/ohuelab/npgpt), a SMILES-based GPT model for unconditional molecular generation (~2.6M parameters). The pretrained NPGPT model is fine-tuned using the REINFORCE policy gradient algorithm with a multi-objective reward function that combines molecular validity (w=1.0), QED drug-likeness (w=0.3), synthetic accessibility (w=0.3, inverted), and NP-likeness (w=0.4), with a −0.5 penalty for invalid SMILES and KL regularization. A frozen copy of the pretrained model serves as a KL divergence reference to prevent mode collapse. Checkpoints are evaluated every 50 steps via sweep, with step 600 selected as the best checkpoint.
+
+
+## Checkpoints
 
 The NPComposer model is available on Hugging Face, and NPGPT checkpoints (pretrained + RL-finetuned) are on Google Drive:
 
