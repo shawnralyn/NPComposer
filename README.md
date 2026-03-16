@@ -7,7 +7,7 @@ A platform for training, evaluating, and comparing SMILES-based language models 
 
 ### NPComposer
 
-![NPComposer Figure](docs/npcomposer_figure.png)
+![NPComposer Figure](docs/npcomposer_figure_2.png)
 
 NPComposer is a conditional molecular generation model trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) — a 46.8M parameter transformer decoder foundation model — on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
 
