@@ -123,7 +123,7 @@ MoleculeEvaluator: evaluates generated molecules. PropertyPredictor: predicts AD
 
 Inputs:
 - smiles_list (List[str]): generated SMILES strings
-- np_repo_root (Optional[str]): NP-Classifier repo path
+- classify (bool): run NPClassifier via UCSD API
 
 Outputs:
 - validity (float): fraction of valid molecules
@@ -132,7 +132,7 @@ Outputs:
 - np_score (Dict[str, float]): NP-likeness statistics
 - results_json (str): JSON output path
 
-Interactions: Takes SMILES from Generation. Calls NPClassifier from Utilities for classification. Provides feedback metrics for Reward and Scoring.
+Interactions: Takes SMILES from Generation. Calls NPClassifier UCSD API for classification. Provides feedback metrics for Reward and Scoring.
 
 ---
 

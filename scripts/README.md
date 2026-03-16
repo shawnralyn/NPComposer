@@ -37,7 +37,7 @@ python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
 python scripts/create_subset.py -i data/raw/npass_full.csv \
     -o data/processed/npass_100000 -s 100000
 
-# With SDF (NPClassifier runs by default if NP_CLASSIFIER_ROOT is set)
+# With SDF
 python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
     --sdf data/raw/coconut_sdf_3d_full.sdf \
     -o data/processed/coconut_100000 -s 100000
@@ -53,7 +53,7 @@ python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
 | --fp_dim | 3 | PCA dimensions for Tanimoto space |
 | --n_jobs | -1 | Parallel workers (-1 = all cores) |
 | --seed | 42 | Random seed |
-| --np_root | NP_CLASSIFIER_ROOT | Path to NP-Classifier repo |
+| --classify | false | Run NPClassifier API classification |
 
 ## merge_training.py
 

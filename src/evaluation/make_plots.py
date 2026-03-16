@@ -1,29 +1,5 @@
 #!/usr/bin/env python3
-"""
-Plot validity, conditioning adherence, uniqueness, and novelty from JSON metric files.
-
-Expected filename pattern:
-    np_classifier_<level>_<label>.json
-
-Examples:
-    np_classifier_pathway_Alkaloids.json
-    np_classifier_superclass_Small_peptides.json
-    np_classifier_class_Isoquinoline_alkaloids.json
-
-This script:
-1. Reads only .json files from a directory
-2. Extracts:
-    - n_total
-    - n_valid
-    - conditioning level from filename (pathway/superclass/class)
-    - conditioning label from filename
-    - uniqueness and novelty metrics
-3. Plots:
-    - validity = n_valid / n_total
-    - conditioning adherence = matched_count / n_valid
-    - uniqueness = n_unique / n_total
-    - novelty = n_novel / n_total
-"""
+"""Plot validity, adherence, uniqueness, and novelty metrics from JSON files."""
 
 import argparse
 import json
@@ -41,15 +17,12 @@ LEVEL_TO_DIST_KEY = {
 
 
 def parse_filename(json_path: Path):
-    """
-    Parse filename like:
-        np_classifier_pathway_Alkaloids.json
+    """Parse filename for level and label.
 
-    Returns:
-        level: pathway / superclass / class
-        label: Alkaloids
-        label_for_json: Alkaloids (underscores replaced with spaces)
-    """
+    Input:
+        json_path: path to JSON file.
+    Output:
+        (level, plot_label, json_label)."""
     stem = json_path.stem
     parts = stem.split("_")
 
@@ -72,6 +45,12 @@ def parse_filename(json_path: Path):
 
 
 def normalize_label(label):
+    """Normalize label for matching.
+
+    Input:
+        label: string.
+    Output:
+        normalized string."""
     label = label.replace("_", " ")
     label = label.lower()
     label = re.sub(r"\s+", " ", label).strip()
@@ -79,6 +58,12 @@ def normalize_label(label):
 
 
 def normalize_json_key(key):
+    """Normalize JSON key for matching.
+
+    Input:
+        key: string.
+    Output:
+        normalized string."""
     key = key.replace("_", " ").lower()
     m = re.match(r"(.*)\s*\(([^)]+)\)", key)
     if m:
@@ -92,10 +77,12 @@ def normalize_json_key(key):
 
 
 def load_json_metrics(json_path: Path):
-    """
-    Load one JSON file and return summary info needed for plotting.
-    Handles label mismatches (e.g., underscores, parentheses).
-    """
+    """Load metrics from JSON file.
+
+    Input:
+        json_path: path to JSON file.
+    Output:
+        dict with metrics and label information."""
     with open(json_path, "r") as f:
         data = json.load(f)
 
@@ -156,9 +143,13 @@ def load_json_metrics(json_path: Path):
 
 
 def plot_validity(results, out_path: Path):
-    """
-    Plot n_valid / n_total for each file (horizontal bar).
-    """
+    """Plot validity for each condition.
+
+    Input:
+        results: list of metric dicts.
+        out_path: output file path.
+    Output:
+        none (saves PNG)."""
     labels = [r["label"] for r in results]
     values = [r["validity"] for r in results]
     annotations = [f'{r["n_valid"]}/{r["n_total"]}' for r in results]
@@ -186,9 +177,13 @@ def plot_validity(results, out_path: Path):
 
 
 def plot_adherence(results, out_path: Path):
-    """
-    Plot matched_count / n_valid for each file (horizontal bar).
-    """
+    """Plot conditioning adherence for each condition.
+
+    Input:
+        results: list of metric dicts.
+        out_path: output file path.
+    Output:
+        none (saves PNG)."""
     labels = [r["label"] for r in results]
     values = [r["adherence"] for r in results]
     annotations = [f'{r["matched_count"]}/{r["n_valid"]}' for r in results]
@@ -216,9 +211,13 @@ def plot_adherence(results, out_path: Path):
 
 
 def plot_uniqueness(results, out_path: Path):
-    """
-    Plot n_unique / n_valid for each file (horizontal bar).
-    """
+    """Plot uniqueness for each condition.
+
+    Input:
+        results: list of metric dicts.
+        out_path: output file path.
+    Output:
+        none (saves PNG)."""
     labels = [r["label"] for r in results]
     values = [r["uniqueness"] for r in results]
     annotations = [f'{r["n_unique"]}/{r["n_valid"]}' for r in results]
@@ -246,9 +245,13 @@ def plot_uniqueness(results, out_path: Path):
 
 
 def plot_novelty(results, out_path: Path):
-    """
-    Plot n_novel / n_valid for each file (horizontal bar).
-    """
+    """Plot novelty for each condition.
+
+    Input:
+        results: list of metric dicts.
+        out_path: output file path.
+    Output:
+        none (saves PNG)."""
     labels = [r["label"] for r in results]
     values = [r["novelty"] for r in results]
     thresholds = [r.get("novelty_threshold") for r in results]

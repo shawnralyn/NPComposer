@@ -1,3 +1,5 @@
+"""Compute molecular metrics: validity, QED, SA, NP-likeness, diversity, uniqueness, novelty."""
+
 import argparse
 import json
 import sys
@@ -13,6 +15,10 @@ from rdkit import RDLogger
 from rdkit.Chem import QED
 from rdkit.Contrib.SA_Score import sascorer
 from rdkit.Chem import AllChem, DataStructs
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -39,7 +45,6 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
-# ── Module-level caches ──────────────────────────────────────────────────────
 _REF_FP_CACHE: Dict[str, List] = {}
 _REF_SMILES_CACHE: Dict[str, set] = {}
 
@@ -60,6 +65,13 @@ def npclassifier_classify(
     max_retries: int = 3,
     sleep_s: float = 3.0,
 ) -> dict:
+    """Call NPClassifier API.
+
+    Input:
+        smiles: SMILES string.
+        base_url, cached, timeout, max_retries, sleep_s: API parameters.
+    Output:
+        dict with pathway/superclass/class or error."""
     if not HAS_REQUESTS:
         return {"error": "requests not installed"}
 
@@ -82,6 +94,12 @@ def npclassifier_classify(
 
 
 def _smiles_to_fp(smiles: str):
+    """Convert SMILES to Morgan fingerprint.
+
+    Input:
+        smiles: SMILES string.
+    Output:
+        fingerprint or None."""
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
@@ -117,6 +135,13 @@ def compute_internal_diversity(fps: List) -> Dict:
 
 
 def _load_smiles(csv_path: str, desc: str = "") -> List[str]:
+    """Load SMILES from CSV file.
+
+    Input:
+        csv_path: path to CSV file.
+        desc: description for logging.
+    Output:
+        list of SMILES strings."""
     try:
         import pandas as pd
         df = pd.read_csv(csv_path)
@@ -145,7 +170,13 @@ def _load_smiles_set_cached(csv_path: str, desc: str = "") -> set:
 
 
 def _load_ref_fps_cached(csv_path: str, desc: str = "") -> List:
-    """Load and cache reference fingerprints (expensive, only done once)."""
+    """Load and cache reference fingerprints.
+
+    Input:
+        csv_path: path to CSV file.
+        desc: description for logging.
+    Output:
+        cached list of fingerprints."""
     if csv_path in _REF_FP_CACHE:
         print(f"  Using cached fingerprints for {desc} ({len(_REF_FP_CACHE[csv_path])} fps)")
         return _REF_FP_CACHE[csv_path]
@@ -205,21 +236,50 @@ def evaluate(
     training_file: str = None,
     novelty_file: str = None,
 ) -> Dict:
-    """
-    Compute validity, SA, QED, NP-likeness, internal diversity, uniqueness,
-    novelty, and optionally superclass stats and NPClassifier distributions.
-    """
+    """Compute all molecular metrics.
+
+    Input:
+        smiles_list: list of SMILES.
+        classify, npclassify: optional classification flags.
+        np_url: NPClassifier endpoint.
+        keep_np_per_mol: store per-molecule classifications.
+        training_file, novelty_file: optional reference files.
+    Output:
+        dict with all computed metrics."""
     sa_scores = []
     qed_scores = []
     np_scores = []
     valid = 0
     valid_smiles = []
+    validity_arr = []  # 1 = valid, 0 = invalid per molecule
+    sanitize_breakdown = Counter()
 
     for s in smiles_list:
-        mol = Chem.MolFromSmiles(s)
-        if mol is None or mol.GetNumAtoms() == 0:
+        mol = Chem.MolFromSmiles(s, sanitize=False)
+        if mol is None:
+            validity_arr.append(0)
+            sanitize_breakdown["parse"] += 1
+            continue
+        try:
+            Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_ALL)
+        except Exception as e:
+            validity_arr.append(0)
+            err = str(e).lower()
+            if "valence" in err:
+                sanitize_breakdown["valence"] += 1
+            elif "kekul" in err:
+                sanitize_breakdown["kekulize"] += 1
+            else:
+                sanitize_breakdown["other"] += 1
             continue
 
+        if mol.GetNumAtoms() == 0:
+            validity_arr.append(0)
+            sanitize_breakdown["other"] += 1
+            continue
+
+        validity_arr.append(1)
+        sanitize_breakdown["valid"] += 1
         valid += 1
         valid_smiles.append(s)
         sa_scores.append(sascorer.calculateScore(mol))
@@ -237,6 +297,7 @@ def evaluate(
         "n_total": n_total,
         "n_valid": valid,
         "validity": round(valid / n_total, 4) if n_total else 0,
+        "sanitize_breakdown": dict(sanitize_breakdown),
         "sa_score": {
             "mean": round(float(np.mean(sa_scores)), 3) if sa_scores else None,
             "std": round(float(np.std(sa_scores)), 3) if sa_scores else None,
@@ -257,6 +318,11 @@ def evaluate(
         }
         if NP_MODEL
         else None,
+        # Raw arrays for histogram plotting (stripped before JSON export)
+        "_sa_scores": sa_scores,
+        "_qed_scores": qed_scores,
+        "_np_scores": np_scores,
+        "_validity_arr": validity_arr,
     }
 
     if valid_smiles:
@@ -354,12 +420,24 @@ def evaluate(
 
 
 def read_smiles_file(input_path: Path) -> List[str]:
+    """Read SMILES from text file.
+
+    Input:
+        input_path: path to file.
+    Output:
+        list of SMILES strings."""
     with input_path.open("r") as f:
         smiles = [line.strip() for line in f if line.strip()]
     return smiles
 
 
 def print_results_summary(results: Dict):
+    """Print summary of results.
+
+    Input:
+        results: metrics dict.
+    Output:
+        none (prints to stdout)."""
     print("\nResults:")
     print(f"  Valid: {results['n_valid']}/{results['n_total']} ({results['validity'] * 100:.1f}%)")
     print(f"  SA: {results['sa_score']['mean']} +/- {results['sa_score']['std']}")
@@ -402,6 +480,141 @@ def print_results_summary(results: Dict):
                     print(f"    {k}: {v}")
 
 
+def plot_histogram(results: Dict, title: str, output_path: Path):
+    """Plot 2x3 histogram of metrics.
+
+    Input:
+        results: metrics dict.
+        title: plot title.
+        output_path: output file path.
+    Output:
+        none (saves PNG)."""
+    c_main = "#4C8BF5"
+
+    sa_scores = np.array(results.get("_sa_scores", []))
+    qed_scores = np.array(results.get("_qed_scores", []))
+    np_scores = np.array(results.get("_np_scores", []))
+    validity_arr = np.array(results.get("_validity_arr", []))
+    sb = results.get("sanitize_breakdown", {})
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 9))
+    fig.suptitle(title, fontsize=14, fontweight="bold", y=0.97)
+
+    # (0,0) Validity bar
+    ax = axes[0, 0]
+    v_pct = float(validity_arr.mean()) * 100 if len(validity_arr) else 0
+    bar = ax.bar(["Validity"], [v_pct], color=c_main, width=0.4, edgecolor="white")
+    ax.text(bar[0].get_x() + bar[0].get_width() / 2, bar[0].get_height() + 1,
+            f"{v_pct:.1f}%", ha="center", va="bottom", fontweight="bold", fontsize=14)
+    ax.set_ylim(0, 110)
+    ax.set_ylabel("Valid (%)")
+    ax.set_title("Validity (sanitized)", fontsize=12, fontweight="bold")
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # (0,1) QED histogram
+    ax = axes[0, 1]
+    if len(qed_scores):
+        bins = np.linspace(0, 1, 21)
+        ax.hist(qed_scores, bins=bins, alpha=0.75, color=c_main, edgecolor="white")
+        ax.axvline(qed_scores.mean(), color="#F5534C", ls="--", lw=2,
+                   label=f"mean={qed_scores.mean():.3f}")
+        ax.legend(fontsize=9)
+    ax.set_ylabel("Count")
+    ax.set_title("QED", fontsize=12, fontweight="bold")
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # (0,2) SA histogram
+    ax = axes[0, 2]
+    if len(sa_scores):
+        sa_min, sa_max = float(sa_scores.min()), float(sa_scores.max())
+        bins = np.linspace(max(0, sa_min - 0.5), min(10, sa_max + 0.5), 21)
+        ax.hist(sa_scores, bins=bins, alpha=0.75, color=c_main, edgecolor="white")
+        ax.axvline(sa_scores.mean(), color="#F5534C", ls="--", lw=2,
+                   label=f"mean={sa_scores.mean():.3f}")
+        ax.legend(fontsize=9)
+    ax.set_ylabel("Count")
+    ax.set_title("SA Score (raw, lower=easier)", fontsize=12, fontweight="bold")
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # (1,0) NP-likeness histogram
+    ax = axes[1, 0]
+    if len(np_scores):
+        np_min, np_max = float(np_scores.min()), float(np_scores.max())
+        bins = np.linspace(np_min - 0.5, np_max + 0.5, 21)
+        ax.hist(np_scores, bins=bins, alpha=0.75, color=c_main, edgecolor="white")
+        ax.axvline(np_scores.mean(), color="#F5534C", ls="--", lw=2,
+                   label=f"mean={np_scores.mean():.3f}")
+        ax.legend(fontsize=9)
+    ax.set_ylabel("Count")
+    ax.set_title("NP-likeness (raw)", fontsize=12, fontweight="bold")
+    ax.spines[["top", "right"]].set_visible(False)
+
+    # (1,1) Sanitization pie chart
+    ax = axes[1, 1]
+    color_map = {
+        "valid": c_main, "parse": "#FFB74D", "valence": "#E57373",
+        "kekulize": "#BA68C8", "other": "#90A4AE",
+    }
+    labels_pie, sizes, colors_pie = [], [], []
+    for cat in ["valid", "parse", "valence", "kekulize", "other"]:
+        if sb.get(cat, 0) > 0:
+            labels_pie.append(cat)
+            sizes.append(sb[cat])
+            colors_pie.append(color_map.get(cat, "#90A4AE"))
+    if sizes:
+        wedges, texts, autotexts = ax.pie(
+            sizes, labels=labels_pie, colors=colors_pie, autopct="%1.1f%%",
+            startangle=90, textprops={"fontsize": 10},
+        )
+        for at in autotexts:
+            at.set_fontweight("bold")
+    ax.set_title("Error Breakdown", fontsize=12, fontweight="bold")
+
+    # (1,2) Summary text
+    ax = axes[1, 2]
+    ax.axis("off")
+    summary_lines = [
+        f"Total molecules: {results['n_total']}",
+        f"Valid: {results['n_valid']} ({results['validity']*100:.1f}%)",
+        f"QED: {results['qed']['mean']} ± {results['qed']['std']}",
+        f"SA: {results['sa_score']['mean']} ± {results['sa_score']['std']}",
+    ]
+    if results.get("np_score"):
+        summary_lines.append(f"NP: {results['np_score']['mean']} ± {results['np_score']['std']}")
+    if "internal_diversity" in results and results["internal_diversity"]["mean"] is not None:
+        d = results["internal_diversity"]
+        summary_lines.append(f"Int. Diversity: {d['mean']} ± {d['std']}")
+    if "uniqueness" in results:
+        u = results["uniqueness"]
+        summary_lines.append(f"Uniqueness: {u['uniqueness']*100:.1f}%")
+    if "novelty" in results:
+        nov = results["novelty"]
+        summary_lines.append(f"Novelty (t<{nov['threshold']}): {nov['novelty']*100:.1f}%")
+
+    ax.text(0.1, 0.95, "\n".join(summary_lines), transform=ax.transAxes,
+            fontsize=12, verticalalignment="top", fontfamily="monospace",
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="#f0f0f0", alpha=0.8))
+    ax.set_title("Summary", fontsize=12, fontweight="bold")
+
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Histogram saved → {output_path}")
+
+
+def _strip_raw_arrays(results: Dict) -> Dict:
+    """Remove raw arrays before JSON export.
+
+    Input:
+        results: metrics dict.
+    Output:
+        dict without raw arrays."""
+    out = dict(results)
+    for k in ["_sa_scores", "_qed_scores", "_np_scores", "_validity_arr"]:
+        out.pop(k, None)
+    return out
+
+
 def evaluate_file(
     input_path: Path,
     output_path: Path = None,
@@ -411,7 +624,18 @@ def evaluate_file(
     keep_np_per_mol: bool = False,
     training_file: str = None,
     novelty_file: str = None,
+    histogram: bool = False,
 ) -> Dict:
+    """Evaluate single SMILES file.
+
+    Input:
+        input_path: SMILES file path.
+        output_path: output JSON path.
+        classify, npclassify, np_url, keep_np_per_mol: classification options.
+        training_file, novelty_file: reference files.
+        histogram: generate plot.
+    Output:
+        metrics dict."""
     smiles = read_smiles_file(input_path)
 
     if not smiles:
@@ -432,10 +656,16 @@ def evaluate_file(
 
     print_results_summary(results)
 
+    # Histogram
+    if histogram:
+        hist_path = (output_path.with_suffix(".png") if output_path
+                     else input_path.with_suffix(".png"))
+        plot_histogram(results, f"Evaluation: {input_path.stem}", hist_path)
+
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with output_path.open("w") as f:
-            json.dump(results, f, indent=2)
+            json.dump(_strip_raw_arrays(results), f, indent=2)
         print(f"\nSaved: {output_path}")
 
     return results
@@ -450,7 +680,18 @@ def evaluate_directory(
     keep_np_per_mol: bool = False,
     training_file: str = None,
     novelty_file: str = None,
+    histogram: bool = False,
 ):
+    """Evaluate batch of SMILES files.
+
+    Input:
+        input_dir: directory with .txt files.
+        output_dir: output directory.
+        classify, npclassify, np_url, keep_np_per_mol: classification options.
+        training_file, novelty_file: reference files.
+        histogram: generate plots.
+    Output:
+        none (saves JSON files)."""
     txt_files = sorted(input_dir.glob("*.txt"))
 
     if not txt_files:
@@ -497,6 +738,7 @@ def evaluate_directory(
                 keep_np_per_mol=keep_np_per_mol,
                 training_file=training_file,
                 novelty_file=novelty_file,
+                histogram=histogram,
             )
             summary.append(
                 {
@@ -537,6 +779,7 @@ def main():
     parser.add_argument("--keep_np_per_mol", action="store_true", help="Store per-molecule NPClassifier assignments in output JSON")
     parser.add_argument("--training", default=None, help="Full training CSV for uniqueness (exact match)")
     parser.add_argument("--novelty_ref", default=None, help="K-means subset CSV for novelty (Tanimoto NN). Falls back to --training if not given.")
+    parser.add_argument("--histogram", action="store_true", help="Generate 2x3 histogram plot (validity/QED/SA/NP/sanitization pie/summary)")
 
     args = parser.parse_args()
 
@@ -562,6 +805,7 @@ def main():
                 keep_np_per_mol=args.keep_np_per_mol,
                 training_file=args.training,
                 novelty_file=args.novelty_ref,
+                histogram=args.histogram,
             )
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
@@ -589,6 +833,7 @@ def main():
                 keep_np_per_mol=args.keep_np_per_mol,
                 training_file=args.training,
                 novelty_file=args.novelty_ref,
+                histogram=args.histogram,
             )
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)

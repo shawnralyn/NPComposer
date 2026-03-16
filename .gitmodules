@@ -1,0 +1,9 @@
+[submodule "external/npgpt/externals/smiles-gpt"]
+	path = external/npgpt/externals/smiles-gpt
+	url = https://github.com/kohbanye/smiles-gpt.git
+[submodule "external/acegen-open"]
+	path = external/acegen-open
+	url = https://github.com/Acellera/acegen-open.git
+[submodule "external/gp-molformer"]
+	path = external/gp-molformer
+	url = https://github.com/IBM/gp-molformer.git

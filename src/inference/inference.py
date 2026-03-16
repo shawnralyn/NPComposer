@@ -10,8 +10,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def parse_yaml(yml_path):
-    """
-    Read a YAML configuration file and return it as a dictionary.
+    """Read YAML configuration file.
+
+    Input:
+        yml_path: path to YAML file.
+    Output:
+        parsed config dict.
     """
     try:
         with open(yml_path, "r") as file:
@@ -23,8 +27,12 @@ def parse_yaml(yml_path):
 
 
 def load_special_tokens_map(json_path):
-    """
-    Load the special_tokens_map.json file.
+    """Load special_tokens_map.json file.
+
+    Input:
+        json_path: path to JSON file.
+    Output:
+        parsed JSON dict.
     """
     try:
         with open(json_path, "r") as f:
@@ -43,8 +51,12 @@ def build_prompt(
     qed_bin=None,
     sa_bin=None,
 ):
-    """
-    Build conditioning prompt from individual tokens.
+    """Build conditioning prompt from individual tokens.
+
+    Input:
+        pathway, superclass, is_glycoside, aromatic_rings, qed_bin, sa_bin: condition tokens.
+    Output:
+        concatenated prompt string.
     """
     parts = []
     if pathway is not None:
@@ -63,13 +75,12 @@ def build_prompt(
 
 
 def extract_pathway_and_superclass_tokens(special_tokens_map):
-    """
-    Extract only special tokens whose content is:
-      - <np_classifier_pathway:...>
-      - <np_classifier_superclass:...>
+    """Extract pathway and superclass tokens from special tokens map.
 
-    Returns:
-        list[str]: raw token strings
+    Input:
+        special_tokens_map: map of special tokens.
+    Output:
+        list of pathway and superclass token strings.
     """
     tokens = []
     for token_info in special_tokens_map.get("additional_special_tokens", []):
@@ -83,8 +94,12 @@ def extract_pathway_and_superclass_tokens(special_tokens_map):
 
 
 def sanitize_token_for_filename(token):
-    """
-    Convert a special token into a filesystem-friendly filename stem.
+    """Convert special token to filesystem-friendly filename stem.
+
+    Input:
+        token: special token string.
+    Output:
+        sanitized filename string.
     """
     text = token.strip("<>")
     text = text.replace(":", "__")
@@ -96,8 +111,10 @@ def sanitize_token_for_filename(token):
 
 
 def set_random_seed(seed):
-    """
-    Set random seed for reproducibility.
+    """Set random seed for reproducibility.
+
+    Input:
+        seed: random seed value.
     """
     if seed is not None:
         torch.manual_seed(seed)
@@ -107,8 +124,12 @@ def set_random_seed(seed):
 
 
 def load_model_and_tokenizer(ckpt_path):
-    """
-    Load tokenizer and causal LM model from checkpoint path.
+    """Load tokenizer and model from checkpoint.
+
+    Input:
+        ckpt_path: path to checkpoint.
+    Output:
+        (tokenizer, model)
     """
     tokenizer = AutoTokenizer.from_pretrained(ckpt_path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
@@ -130,11 +151,20 @@ def generate_smiles_for_prompt(
     show_progress=False,
     progress_desc=None,
 ):
-    """
-    Generate molecules for a single prompt.
+    """Generate molecules for a prompt.
 
-    Returns:
-        list[str]: generated SMILES strings
+    Input:
+        model: language model.
+        tokenizer: tokenizer.
+        prompt: conditioning prompt.
+        num_molecules: number to generate.
+        top_p: nucleus sampling parameter.
+        temperature: sampling temperature.
+        max_new_tokens: max tokens to generate (default 200).
+        show_progress: show progress bar.
+        progress_desc: progress bar description.
+    Output:
+        list of generated SMILES strings.
     """
     x = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
     prompt_len = x["input_ids"].shape[1]
@@ -176,8 +206,11 @@ def generate_smiles_for_prompt(
 
 
 def write_smiles_to_file(smiles_list, out_file):
-    """
-    Write one SMILES per line.
+    """Write SMILES list to file (one per line).
+
+    Input:
+        smiles_list: list of SMILES strings.
+        out_file: output file path.
     """
     out_file.parent.mkdir(parents=True, exist_ok=True)
     with out_file.open("w") as f:
@@ -186,8 +219,13 @@ def write_smiles_to_file(smiles_list, out_file):
 
 
 def run_single_prompt_mode(args, configs, model, tokenizer):
-    """
-    Original single-prompt inference mode.
+    """Run inference in single-prompt mode.
+
+    Input:
+        args: parsed command-line arguments.
+        configs: config dict.
+        model: language model.
+        tokenizer: tokenizer.
     """
     if any(
         [
@@ -236,12 +274,13 @@ def run_single_prompt_mode(args, configs, model, tokenizer):
 
 
 def run_batch_special_token_mode(args, configs, model, tokenizer):
-    """
-    Batch mode:
-    - read special_tokens_map.json
-    - find pathway/superclass tokens
-    - generate num_molecules for each token
-    - write one output file per token
+    """Run inference in batch mode over all pathway/superclass tokens.
+
+    Input:
+        args: parsed command-line arguments.
+        configs: config dict.
+        model: language model.
+        tokenizer: tokenizer.
     """
     if args.special_tokens_map is None:
         raise ValueError(
@@ -303,12 +342,9 @@ def run_batch_special_token_mode(args, configs, model, tokenizer):
 
 
 def main():
-    """
-    Run inference with trained language model.
+    """Run inference with trained language model.
 
-    Supports:
-      1. Single prompt mode
-      2. Batch mode over all pathway/superclass special tokens from a JSON file
+    Supports single-prompt and batch modes.
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("--yaml", required=True, help="Inference YAML configuration file")

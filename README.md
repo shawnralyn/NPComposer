@@ -1,313 +1,391 @@
 # NPComposer
 
-NPComposer is a SMILES-based molecular generation language model enabling controllable generation of diverse natural product (NP) molecules. 
+NPComposer is a SMILES-based molecular generation language model enabling controllable generation of diverse natural product (NP) molecules.
 
 ![NPComposer Figure](docs/npcomposer_figure.png)
 
-NPComposer was trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) - a 46.8M parameter transformer decoder foundation model - on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
+NPComposer was trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) — a 46.8M parameter transformer decoder foundation model — on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
 
-By providing class labels and molecular property information as special tokens during model fine-tuning, NPComposer allows for conditional natural product generation based on: 
-- NP biosynthesis pathway (i.e. terpenoid, polyketide, alkaloid, etc.)
-- NP superclass (i.e. monoterpenoid, macrolide, serine alkaloid, etc.)
-- Presence or absence of glycoside
-- Number of aromatic rings (0 - 22)
-- QED drug likeliness (0-1)
-- Synthetic accessibility score (1-10)
+By providing class labels and molecular property information as special tokens during model fine-tuning, NPComposer allows for conditional natural product generation based on: NP biosynthesis pathway (7 pathways including Alkaloids, Terpenoids, Shikimates and Phenylpropanoids, etc.), NP superclass (100+ superclasses), presence or absence of glycoside, number of aromatic rings (0–22), QED drug-likeness (0–1), and synthetic accessibility score (1–10).
 
 
-## Model
-The NPComposer model is available for inference or retraining on Hugging Face:
+## Model & Checkpoints
+
+The NPComposer model is available on Hugging Face, and NPGPT checkpoints (pretrained + RL-finetuned) are on Google Drive:
 
 [![Model on 🤗](https://img.shields.io/badge/Model%20on-%F0%9F%A4%97-yellow?style=for-the-badge)](https://huggingface.co/ralyn/NPComposer-v2)
+[![Checkpoints](https://img.shields.io/badge/Checkpoints-Google%20Drive-4285F4?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/drive/u/0/folders/1N0qUxMJWN6szxo-HCSikyCip2FY2aSsg)
+
+| Resource | Link |
+|----------|------|
+| NPComposer (HuggingFace) | https://huggingface.co/ralyn/NPComposer-v2/tree/main |
+| NPGPT Checkpoints (Google Drive) | https://drive.google.com/drive/u/0/folders/1N0qUxMJWN6szxo-HCSikyCip2FY2aSsg |
+
+
+## Quick Start
+
+```bash
+# Full automated setup (dependencies + submodules + checkpoints + verification)
+bash setup.sh
+
+# Or with GPU support
+bash setup.sh --gpu
+
+# Or minimal setup via Make
+make setup
+```
+
+`setup.sh` handles everything: Python dependencies, git submodules (npgpt, acegen-open, gp-molformer), checkpoint verification, NPClassifier setup, and directory structure creation. Run `bash setup.sh --help` for all options.
+
 
 ## Structure
 
 ```
 NPComposer/
+├── setup.sh                        # Full automated setup script
+├── Makefile                        # Build automation (setup, data, eval, molecule gen)
 ├── conf/
-│   └── config.yaml             # Hydra configuration
+│   ├── config.yaml                 # Hydra configuration
+│   ├── train.yaml                  # Training configuration
+│   └── inference.yaml              # Inference configuration
 ├── data/
-│   ├── raw/                    # Original data
-│   │   ├── npass/              # NPASS files
-│   │   ├── coconut_csv_full.csv
-│   │   └── coconut_sdf_3d_full.sdf
-│   ├── processed/              # Filtered subsets + training_data.csv
-│   └── splits/                 # Train/Val/Test
-├── scripts/
-│   ├── download_data.sh        # Download COCONUT
-│   ├── download_npass.sh       # Download NPASS
-│   ├── merge_npass.py          # Merge NPASS files
-│   ├── create_subset.py        # Create subset (K-means)
-│   ├── merge_training.py       # Merge subsets into training data
-│   ├── split_data.py           # Train/Val/Test split
-│   ├── analyze_distribution.py # Raw vs processed distribution analysis
-│   ├── analyze_sdf.py          # Analyze SDF structure
-│   ├── run_evaluation_Shawn_model1.sh          # Shawn_model1 evaluation
-│   ├── run_evaluation_Shawn_model1_optimal.sh  # + SA/QED optimal
-│   ├── run_evaluation_Shawn_model1_pathway_optimal.sh  # + pathway
-│   ├── run_evaluation_NPGPT.sh # NPGPT baseline evaluation
-│   └── npgpt_generate.py       # NPGPT generation wrapper (seed control)
+│   ├── raw/                        # Original data (COCONUT, NPASS)
+│   ├── processed/                  # Filtered subsets + training_data.csv
+│   └── splits/                     # Train/Val/Test splits
 ├── src/
-│   ├── classification/
-│   │   └── npclassifier.py     # NPClassifier local inference (batched)
+│   ├── training/
+│   │   └── train.py                # NPComposer fine-tuning
+│   ├── inference/
+│   │   └── inference.py            # NPComposer conditional generation
+│   ├── npgpt-rl/
+│   │   ├── train_rl.py             # REINFORCE RL fine-tuning for NPGPT
+│   │   ├── reward.py               # Multi-objective reward (validity + QED + SA + NP-likeness)
+│   │   ├── compare_models.py       # Pretrained vs RL model comparison
+│   │   └── sweep_checkpoints.py    # Checkpoint sweep evaluation
 │   ├── evaluation/
-│   │   └── metrics.py          # Evaluation metrics (validity, SA, QED, diversity, uniqueness, novelty)
-│   └── inference/
-│       └── inference.py        # NPComposer inference
+│   │   ├── evaluate.py             # Unified evaluation (NPGPT + GP-MoLFormer)
+│   │   ├── evaluate_shawn.py       # NPComposer evaluation (7 pathway + optimal configs)
+│   │   ├── compare_all_models.py   # Cross-model comparison bar chart
+│   │   ├── compute_metrics.py      # Standalone metrics computation
+│   │   └── make_plots.py           # Plot generation utilities
+│   └── data_preprocessing/
+│       ├── bin_cont_variables.py   # QED/SA bin definitions for conditioning tokens
+│       ├── rdkit_metrics.py        # RDKit-based molecular property calculations
+│       └── stratified_train_split.py  # Stratified train/val/test splitting
+├── scripts/
+│   ├── make_molecule.py            # Single molecule generation + visualization
+│   ├── create_subset.py            # K-means subset creation in Tanimoto space
+│   ├── merge_training.py           # Merge COCONUT + NPASS into training_data.csv
+│   ├── merge_npass.py              # Merge NPASS TSV files
+│   ├── split_data.py               # Train/val/test splitting
+│   ├── clean_npdrug.py             # NP-Drug dataset cleaning
+│   ├── analyze_distribution.py     # Raw vs processed distribution comparison
+│   ├── analyze_sdf.py              # SDF file analysis
+│   ├── download_data.sh            # COCONUT download
+│   ├── download_npass.sh           # NPASS download
+│   └── download_np_drug.sh         # NP-Drug download
 ├── external/
-│   └── npgpt/                  # NPGPT baseline (gitignored)
-├── tests/                      # pytest test suite
-├── Makefile                    # Build automation
-├── npcomposer.def              # Apptainer container definition
-└── requirements.txt
+│   ├── npgpt/                      # NPGPT baseline (git submodule)
+│   ├── gp-molformer/               # GP-MoLFormer baseline (git submodule)
+│   └── acegen-open/                # AceGen RL framework (git submodule)
+├── tests/                          # pytest test suite
+├── requirements.txt
+└── npcomposer.def                  # Apptainer container definition
 ```
 
-## Quick Start
-
-```bash
-# Option 1: Using Make
-make all
-
-# Option 2: Using the full pipeline script
-bash scripts/run_pipeline.sh
-
-# Option 3: Skip download if data already exists
-bash scripts/run_pipeline.sh --skip-download --size 100000
-```
-
-`make all` runs: setup -> download -> subset -> split -> merge -> test.
-`run_pipeline.sh` runs the same steps as a single script with configurable flags.
-
-For individual datasets:
-
-```bash
-make all-coconut
-make all-npass
-```
-
-To override defaults:
-
-```bash
-make subset-coconut SIZE=100000 SA_MAX=5.0 SEED=42
-```
-
-## NPClassifier Setup
-
-NPClassifier runs locally (no server, no network). One-time setup:
-
-```bash
-git clone https://github.com/mwang87/NP-Classifier
-cd NP-Classifier/Classifier/models_folder/models
-wget -O models.zip "https://zenodo.org/record/5068687/files/model.zip?download=1"
-unzip models.zip
-```
-
-Set the environment variable:
-
-```bash
-export NP_CLASSIFIER_ROOT=/path/to/NP-Classifier
-```
-
-Or pass `--np_root` to scripts directly.
-
-### NPClassifier in the Pipeline
-
-Classification is enabled by default (`CLASSIFY=true`). Set `NP_CLASSIFIER_ROOT` before running:
-
-```bash
-export NP_CLASSIFIER_ROOT=~/NP-Classifier
-make all
-```
-
-To skip classification:
-
-```bash
-make all CLASSIFY=false
-```
-
-### Standalone Evaluation with Classification
-
-```bash
-python src/evaluation/metrics.py -i generated.txt -o results.json \
-    --np_root ~/NP-Classifier
-```
 
 ## Model Evaluation
 
-Evaluation scripts generate molecules, then compute validity, SA, QED, internal diversity, uniqueness, and novelty. Uniqueness is measured as the fraction of generated canonical SMILES not found in the full COCONUT training set (Geo2Seq, ICML 2025). Novelty is measured as the fraction of molecules whose nearest-neighbor Tanimoto similarity (Morgan FP, radius=2, 1024 bits) to a K-means reference subset falls below 0.4 (f-RAG, NeurIPS 2024).
+The evaluation system compares 4 models across multiple configurations with standardized metrics.
 
-### Shawn_model1 (superclass-conditioned)
+### Models
 
-Generates 10 molecules per superclass (76 total) across 3 random seeds.
+| Model | Type | Conditioning | Script |
+|-------|------|-------------|--------|
+| NPGPT (Pretrained) | Unconditional baseline | None | `evaluate.py npgpt` |
+| NPGPT (RL-finetuned) | RL-optimized | None (reward: QED+SA+NP+validity) | `evaluate.py npgpt-rl` |
+| GP-MoLFormer | Foundation model baseline | None | `evaluate.py gpmolformer` |
+| NPComposer (QED+SA) | Conditional generation | `<qed_bin:0.9<=qed<1><sa_bin:1<=sa<2>` | `evaluate_shawn.py` |
+| NPComposer (per-pathway) | Conditional + pathway | `<np_classifier_pathway:X><qed_bin:...><sa_bin:...>` | `evaluate_shawn.py` |
 
-```bash
-make eval-shawn                          # full (76 superclasses × 10 × 3 seeds)
-make eval-shawn EVAL_TOP=3              # test with top 3 superclasses
-make eval-shawn EVAL_NUM=20             # 20 molecules per superclass
-make eval-shawn-optimal                  # + SA best + QED best conditioning
-make eval-shawn-pathway                  # pathway + SA/QED optimal (7 pathways)
-```
+NPComposer evaluation supports all 7 NPClassifier pathways: Alkaloids, Amino acids and Peptides, Carbohydrates, Fatty acids, Polyketides, Shikimates and Phenylpropanoids, and Terpenoids.
 
-Or run scripts directly:
+### Metrics
 
-```bash
-bash scripts/run_evaluation_Shawn_model1.sh
-bash scripts/run_evaluation_Shawn_model1.sh --top 3 --num 20 --seeds "1 2 3 4 5"
-```
+| Metric | Definition | Range |
+|--------|-----------|-------|
+| Validity | Fraction of valid SMILES (sanitization-based: parse/valence/kekulize checks) | 0–1 |
+| QED | Drug-likeness score | 0–1 (higher = better) |
+| SA Score | Synthetic accessibility | 1–10 (lower = better) |
+| NP-likeness | Natural product likeness | ~-3 to +3 (higher = more NP-like) |
+| Internal Diversity | Mean pairwise Tanimoto similarity (Morgan FP, r=2, 2048 bits) | 0–1 (lower = more diverse) |
+| Uniqueness | Fraction not in training set (NPGPT only) | 0–1 |
+| Novelty | Fraction with NN Tanimoto < 0.4 to reference set (NPGPT only) | 0–1 |
+| Pathway Accuracy | NPClassifier classification accuracy vs conditioning token (NPComposer, `--classify`) | 0–1 |
 
-Results are saved to `outputs/Shawn_model1/evaluation/`.
-
-### NPGPT (unconditional baseline)
-
-NPGPT generates SMILES without class conditioning. We generate 760 molecules per seed (matching Shawn_model1's total of 76 × 10) to compare fairly.
-
-Prerequisites:
-
-```bash
-cd external/npgpt
-git submodule update --init --recursive
-uv sync
-# Download checkpoint from Google Drive:
-# https://drive.google.com/drive/folders/1olCPouDkaJ2OBdNaM-G7IU8T6fBpvPMy
-# Place as: external/npgpt/checkpoints/smiles-gpt/model.ckpt
-```
-
-Run evaluation:
+### Running Evaluations
 
 ```bash
-make eval-npgpt                          # 760 molecules × 3 seeds
-make eval-npgpt-classify                 # + NPClassifier superclass distribution
+# Individual models
+python src/evaluation/evaluate.py npgpt-rl          # NPGPT pretrained vs RL
+python src/evaluation/evaluate.py gpmolformer        # GP-MoLFormer
+
+# NPComposer (all 8 configs: 1 optimal + 7 pathways)
+python src/evaluation/evaluate_shawn.py
+
+# NPComposer pathway classification only (skip optimal_params)
+python src/evaluation/evaluate_shawn.py --classify
+
+# NPComposer specific configs
+python src/evaluation/evaluate_shawn.py --configs pathway_alkaloid pathway_terpenoid
+
+# Cross-model comparison (bar chart)
+python src/evaluation/compare_all_models.py
+python src/evaluation/compare_all_models.py --ref_model "NPGPT (RL)"
+python src/evaluation/compare_all_models.py --pairs all
+
+# Via Make
+make eval-all              # Run everything + comparison
+make eval-npgpt-rl         # NPGPT pretrained vs RL only
+make eval-gpmolformer      # GP-MoLFormer only
+make eval-npcomposer       # NPComposer only
+make eval-compare          # Comparison plot only
 ```
 
-Or run script directly:
+Each evaluation generates per-seed JSON results, 2x3 histograms (validity / QED / SA / NP-likeness / error breakdown / summary), and aggregate statistics. The `--classify` flag enables NPClassifier API calls to measure pathway adherence accuracy and produces a combined accuracy + predicted distribution chart.
+
+### Configuration
+
+All evaluations default to 3 seeds x 50 molecules per seed. Override via CLI:
 
 ```bash
-bash scripts/run_evaluation_NPGPT.sh
-bash scripts/run_evaluation_NPGPT.sh --num 100 --seeds "1 2 3"
+python src/evaluation/evaluate.py npgpt-rl --seeds 1 2 3 4 5 --n_samples 100 --temperature 1.5
+python src/evaluation/evaluate_shawn.py --configs optimal_params pathway_alkaloid --n_samples 100
 ```
 
-Results are saved to `outputs/NPGPT/evaluation/`.
 
-### Run All Evaluations
+## Molecule Generation
+
+Generate a single valid molecule with RDKit visualization:
 
 ```bash
-make eval-all                            # Shawn_model1 + NPGPT
+# Via Make (recommended)
+make molecule MODEL=npgpt
+make molecule MODEL=npgpt-rl
+make molecule MODEL=gpmolformer
+make molecule MODEL=npcomposer PROMPT="<np_classifier_pathway:Alkaloids><qed_bin:0.9<=qed<1><sa_bin:1<=sa<2>"
+
+# Direct script
+python scripts/make_molecule.py npgpt-rl --temperature 1.5
+python scripts/make_molecule.py npcomposer --prompt "<np_classifier_pathway:Terpenoids>"
 ```
 
-### Evaluation Metrics
+The script retries until a valid SMILES is produced (up to 50 attempts), saves a PNG image, displays it (iTerm2 inline / Kitty / sixel / macOS Preview), and prints the canonical SMILES.
 
-| Metric | Definition | Reference |
-|--------|-----------|-----------|
-| Validity | Fraction of valid SMILES (RDKit parseable) | — |
-| SA Score | Synthetic accessibility (1=easy, 10=hard) | Ertl & Schuffenhauer, 2009 |
-| QED | Drug-likeness (0–1, higher=better) | Bickerton et al., 2012 |
-| Internal Diversity | Mean pairwise Tanimoto distance among generated molecules | — |
-| Uniqueness | Fraction of generated SMILES not in training set | Geo2Seq (ICML 2025) |
-| Novelty | Fraction with NN Tanimoto similarity < 0.4 to reference set | f-RAG (NeurIPS 2024) |
 
-## Setup
+## RL Fine-tuning (NPGPT)
+
+NPGPT is fine-tuned with REINFORCE policy gradient to optimize a multi-objective reward combining validity, QED, SA (inverted: lower raw SA = higher reward), and NP-likeness.
 
 ```bash
-make setup
-# Or
-pip install -r requirements.txt
+python src/npgpt-rl/train_rl.py \
+    --orig_ckpt src/npgpt-rl/npgpt.ckpt \
+    --w_validity 1.0 --w_qed 0.3 --w_sa 0.3 --w_np_likeness 0.4
+
+# Sweep checkpoints to find best step
+python src/npgpt-rl/sweep_checkpoints.py
+
+# Compare pretrained vs RL
+python src/npgpt-rl/compare_models.py
 ```
 
-Requires `tensorflow` for NPClassifier local inference (already in requirements.txt).
+Reward function (in `reward.py`):
 
-## Test
+| Component | Weight | Formula |
+|-----------|--------|---------|
+| Validity | 1.0 | 1.0 if valid SMILES, else penalty |
+| QED | 0.3 | QED score [0, 1] |
+| SA | 0.3 | (10 - raw_SA) / 9 → [0, 1] where 1 = easiest |
+| NP-likeness | 0.4 | Normalized NP score |
+| Invalid penalty | -0.5 | Applied to unparseable SMILES |
 
-```bash
-make test
+
+## Conditioning Tokens
+
+NPComposer uses special tokens as conditioning prompts during generation. All available tokens are defined in the model's `special_tokens_map.json`:
+
+| Token Type | Example | Count |
+|------------|---------|-------|
+| Pathway | `<np_classifier_pathway:Alkaloids>` | 7 |
+| Superclass | `<np_classifier_superclass:Flavonoids>` | 100+ |
+| Glycoside | `<np_classifier_is_glycoside:True>` | 2 |
+| Aromatic rings | `<aromatic_rings_count:3>` | 22 (0–22) |
+| QED bin | `<qed_bin:0.9<=qed<1>` | 10 (0.0–1.0, step 0.1) |
+| SA bin | `<sa_bin:1<=sa<2>` | 9 (1.0–10.0, step 1.0) |
+
+Multiple tokens can be combined in a single prompt:
+
+```python
+# Example: Generate alkaloid with high QED and low SA
+prompt = "<np_classifier_pathway:Alkaloids><qed_bin:0.9<=qed<1><sa_bin:1<=sa<2>"
 ```
 
-Skip slow tests:
+All 7 NPClassifier pathways:
 
-```bash
-make test-quick
+```
+Alkaloids, Amino acids and Peptides, Carbohydrates, Fatty acids,
+Polyketides, Shikimates and Phenylpropanoids, Terpenoids
 ```
 
-## Manual Usage
 
-```bash
-# COCONUT
-bash scripts/download_data.sh
-python scripts/create_subset.py -i data/raw/coconut_csv_full.csv \
-    --sdf data/raw/coconut_sdf_3d_full.sdf \
-    -o data/processed/coconut_100000 -s 100000 --seed 42
-
-# NPASS
-bash scripts/download_npass.sh
-python scripts/merge_npass.py -i data/raw/npass -o data/raw/npass_full.csv
-python scripts/create_subset.py -i data/raw/npass_full.csv \
-    -o data/processed/npass_100000 -s 100000 --seed 42
-
-# Merge training data
-python scripts/merge_training.py \
-    --coconut data/processed/coconut_100000.csv \
-    --npass data/processed/npass_100000.csv \
-    -o data/processed/training_data.csv
-
-# Split & Evaluate
-python scripts/split_data.py -i data/processed/coconut_100000.csv -o data/splits/ --seed 42
-python src/evaluation/metrics.py -i generated.txt -o results.json
-```
-
-## Apptainer
-
-```bash
-make apptainer
-make shell
-apptainer exec --bind ./data:/app/data npcomposer.sif make pipeline-coconut
-```
-
-## Pipeline
+## Data Pipeline
 
 ```
 Raw Data (COCONUT 715K / NPASS 203K)
     ↓ Valid SMILES filter
-    ↓ Atom count filter (<= 150)
-    ↓ Ring count filter (<= 10)
-    ↓ SA filter (<= 6.0)
+    ↓ Atom count filter (≤ 150)
+    ↓ Ring count filter (≤ 10)
+    ↓ SA filter (≤ 6.0)
     ↓ Tanimoto space embedding (FP → PCA 3D)
     ↓ K-means clustering (Tanimoto FP + SA/QED/NPL)
-    ↓ NPClassifier superclass labeling (local)
+    ↓ NPClassifier superclass labeling
 Subset (100K each) → Merge → training_data.csv → Train/Val/Test (seed=42)
-    ↓ Distribution analysis (raw vs processed histograms + stats)
 ```
 
-### Filter Justifications
+```bash
+make download-all       # Download COCONUT + NPASS + NP-Drug
+make pipeline-all       # Process everything
+make all                # setup → download → pipeline → test
+```
 
-- SA <= 6.0: Molecules with SA scores above 6 are considered very difficult to synthesize in practice (Ertl & Schuffenhauer, 2009). Since the goal of this tool is to propose synthetically accessible natural product candidates, excluding hard-to-synthesize molecules prevents the model from learning to generate impractical outputs. The SA scale ranges from 1 (easy) to 10 (hard), and a threshold of 6.0 retains the majority of drug-like natural products while filtering out highly complex structures.
-- Ring count <= 10: Natural products with more than 10 rings are rare outliers in COCONUT (< 1% of the dataset) and tend to be large macrocyclic or polymeric structures that are difficult to synthesize and characterize. Removing them reduces noise and keeps the training distribution focused on typical drug-like NP scaffolds.
-- Atom count <= 150: Molecules exceeding 150 heavy atoms are typically large polymeric or peptidic natural products that produce very long SMILES strings, leading to tokenization issues and disproportionate memory usage during training. This cutoff retains > 99% of the dataset.
+
+## NPClassifier
+
+Pathway classification uses the [NPClassifier UCSD API](https://npclassifier.ucsd.edu) — no local installation needed. Enable it with the `--classify` flag during NPComposer evaluation:
+
+```bash
+# Classify all 7 pathways (skips optimal_params automatically)
+python src/evaluation/evaluate_shawn.py --classify
+
+# Classify specific pathways
+python src/evaluation/evaluate_shawn.py --classify --configs pathway_alkaloid pathway_terpenoid
+```
+
+This generates a 2-panel chart: pathway classification accuracy (left) and predicted pathway distribution (right).
+
+
+## Apptainer
+
+```bash
+make apptainer          # Build container
+make shell              # Interactive shell
+apptainer exec --bind ./data:/app/data npcomposer.sif make pipeline-coconut
+```
+
+
+## Testing
+
+```bash
+make test               # All tests
+make test-quick         # Skip slow tests
+```
+
+
+## Make Targets
+
+```bash
+make help               # Show all available targets
+make setup              # Install dependencies
+make eval-all           # Run all evaluations + comparison
+make eval-npgpt-rl      # NPGPT pretrained vs RL
+make eval-gpmolformer   # GP-MoLFormer
+make eval-npcomposer    # NPComposer (all configs)
+make eval-compare       # Cross-model comparison chart
+make molecule MODEL=X   # Generate & visualize a single molecule
+make pipeline-all       # Full data pipeline
+make download-all       # Download all datasets
+make test               # Run pytest suite
+make clean              # Remove generated artifacts
+```
 
 
 ## Dataset Sources
 
-- COCONUT (COlleCtion of Open Natural prodUcTs): An open-access database aggregating natural product structures from over 50 individual sources including DNP, UNPD, NUBBEDB, and others. Contains ~715K molecules with SMILES, InChI, and molecular descriptors. Source: https://coconut.naturalproducts.net. License: open access. Reference: Sorokina et al., "COCONUT online: Collection of Open Natural Products database," J. Cheminform., 2021.
-- NPASS (Natural Product Activity and Species Source Database): A curated database of ~203K natural products with recorded biological activity data, species source information, and target annotations. Maintained by CSBIO, NUS. Source: https://bidd.group/NPASS/. Reference: Zeng et al., "NPASS: Natural product activity and species source database," Nucleic Acids Res., 2018.
-- NP-Drug: A dataset of ~3K natural products with known drug activity, used for downstream evaluation and drug discovery benchmarking. Source: downloaded via `scripts/download_np_drug.sh`.
+COCONUT (COlleCtion of Open Natural prodUcTs): ~715K molecules. Source: https://coconut.naturalproducts.net. Reference: Sorokina et al., J. Cheminform., 2021.
 
-## Computed Columns (RDKit)
+NPASS (Natural Product Activity and Species Source Database): ~203K molecules. Source: https://bidd.group/NPASS/. Reference: Zeng et al., Nucleic Acids Res., 2018.
 
-| Column | Description | Range |
-|--------|-------------|-------|
-| sa_score | Synthetic accessibility | 1-10 (lower=easier) |
-| qed | Drug-likeness | 0-1 (higher=better) |
-| npl_score | NP-likeness | -3~+3 (higher=more NP-like) |
+NP-Drug: ~3K natural products with known drug activity for downstream evaluation.
 
-## Configuration
 
-All defaults are managed via `conf/config.yaml` (Hydra). Override from CLI:
+## References
 
-```bash
-python scripts/create_subset.py filtering.sa_max=5.0 subset.size=100000
+This project builds upon and integrates the following works. If you use NPComposer, please cite the relevant papers:
+
+### GP-MoLFormer (Foundation Model)
+
+NPComposer is fine-tuned from GP-MoLFormer, a 46.8M parameter autoregressive transformer decoder for molecular generation.
+
+```bibtex
+@article{ross2024gpmolformer,
+  title={GP-MoLFormer: A Foundation Model For Molecular Generation},
+  author={Ross, Jerret and Belgodere, Brian and Hoffman, Samuel C and Chenthamarakshan, Vijil and Mroueh, Youssef and Das, Payel},
+  journal={arXiv preprint arXiv:2405.04912},
+  year={2024}
+}
 ```
 
-## Citation
+### NPGPT (Baseline Model)
 
-This project uses [NP-Classifier](https://github.com/mwang87/NP-Classifier) for natural product classification. If you use NPComposer, please cite:
+NPGPT is the SMILES-based GPT model used as the unconditional baseline and RL fine-tuning target.
+
+```bibtex
+@article{sakano2025npgpt,
+  title={NPGPT: Natural Product-Like Compound Generation with GPT-based Chemical Language Models},
+  author={Sakano, Kengo and Furui, Katsuhiko and Ohue, Masahito},
+  journal={The Journal of Supercomputing},
+  volume={81},
+  pages={1--20},
+  year={2025},
+  publisher={Springer}
+}
+```
+
+### SMILES-GPT (Tokenizer & Architecture)
+
+SMILES-GPT provides the GPT-2 tokenizer and base transformer architecture used by NPGPT.
+
+```bibtex
+@article{adilov2021smilesgpt,
+  title={Generative Pre-Training from Molecules},
+  author={Adilov, Sanjar},
+  journal={ChemRxiv Preprint},
+  year={2021},
+  doi={10.26434/chemrxiv-2021-5fwjd}
+}
+```
+
+### AceGen (RL Framework Reference)
+
+AceGen was referenced as an RL framework for applying policy gradient methods to chemical language models.
+
+```bibtex
+@article{bou2024acegen,
+  title={ACEGEN: Reinforcement Learning of Generative Chemical Agents for Drug Discovery},
+  author={Bou, Albert and Thomas, Morgan and Dittert, Sebastian and Navarro, Carles and Majewski, Maciej and Wang, Ye and Patel, Shivam and Tresadern, Gary and Ahmad, Mazen and Moens, Vincent and others},
+  journal={Journal of Chemical Information and Modeling},
+  volume={64},
+  number={15},
+  pages={5900--5911},
+  year={2024},
+  publisher={ACS Publications},
+  doi={10.1021/acs.jcim.4c00895}
+}
+```
+
+### NPClassifier (Pathway Classification)
+
+NPClassifier is used via its public API for pathway classification accuracy evaluation.
 
 ```bibtex
 @article{kim2021npclassifier,
@@ -323,8 +401,7 @@ This project uses [NP-Classifier](https://github.com/mwang87/NP-Classifier) for 
 }
 ```
 
+
 ## Third-Party Licenses
 
-This project uses code adapted from
-[NP-Classifier](https://github.com/mwang87/NP-Classifier) (MIT License).
-See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for full details.
+This project includes code from the following open-source projects: [NPGPT](https://github.com/ohuelab/npgpt) (MIT), [SMILES-GPT](https://github.com/sanjaradylov/smiles-gpt) (Clear BSD), [GP-MoLFormer](https://github.com/IBM/gp-molformer) (Apache 2.0), [AceGen](https://github.com/Acellera/acegen-open) (MIT), and [NP-Classifier](https://github.com/mwang87/NP-Classifier) (MIT). See [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) for full license texts.

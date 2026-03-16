@@ -1,8 +1,4 @@
-"""Append rdkit metrics to COCONUT database CSV.
-
-Synthetic accessibility (SA) score only in this version, but can be easily updated for 
-additional rdkit metrics.
-"""
+"""Compute RDKit SA scores for COCONUT CSV."""
 
 import argparse
 from typing import Dict, Optional, Any
@@ -15,15 +11,12 @@ from rdkit.Contrib.SA_Score import sascorer
 
 
 def compute_sa_score(smiles: str) -> Dict[str, Any]:
-    """Compute synthetic accessibility score from a SMILES string.
+    """Compute synthetic accessibility score from SMILES string.
 
-    Args:
-        smiles (str): SMILES string representing a molecule.
-
-    Returns:
-        Dict[str, Any]: Dictionary with keys:
-            - 'valid' (bool): Whether the SMILES was successfully parsed.
-            - 'sa' (Optional[float]): The SA score, or None if computation failed.
+    Input:
+        smiles: SMILES string.
+    Output:
+        dict: {'valid': bool, 'sa': float or None}
     """
     result: Dict[str, Any] = {'valid': False, 'sa': None}
 
@@ -46,14 +39,11 @@ def compute_sa_score(smiles: str) -> Dict[str, Any]:
 
 
 def main() -> None:
-    """Compute synthetic accessibility (SA) scores for molecules in a COCONUT database CSV.
+    """Compute SA scores for COCONUT CSV.
 
-    Reads the input CSV, computes SA scores for each valid SMILES in the 'canonical_smiles'
-    column, appends the scores as a new 'sa_score' column, and writes the result to an output CSV.
-
-    Command-line Arguments:
-        --coconut (str): Path to input COCONUT CSV file.
-        --out_file (str): Path to output CSV file with SA scores appended.
+    Input:
+        --coconut: Path to input CSV.
+        --out_file: Path to output CSV.
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("--coconut", required=True, help="Path to COCONUT CSV")
@@ -61,7 +51,6 @@ def main() -> None:
                     help="Path to updated COCONUT CSV")
     args = ap.parse_args()
 
-    # read in COCONUT csv and drop missing values in canonical smiles column
     df: pd.DataFrame = pd.read_csv(args.coconut).dropna(
         subset=['canonical_smiles'])
 

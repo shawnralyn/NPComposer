@@ -8,7 +8,7 @@
 #
 # Prerequisites:
 #   - pip install -r requirements.txt
-#   - export NP_CLASSIFIER_ROOT=/path/to/NP-Classifier (optional, for classification)
+#   - NPClassifier classification uses UCSD API (no local setup needed)
 
 set -e
 
@@ -54,15 +54,10 @@ echo ""
 echo "--- Step 3/6: Creating subsets ---"
 mkdir -p data/processed
 
-NP_FLAG=""
-if [ -n "$NP_CLASSIFIER_ROOT" ]; then
-    NP_FLAG="--np_root $NP_CLASSIFIER_ROOT"
-fi
-
 python3 scripts/create_subset.py \
     -i data/raw/coconut_csv_full.csv \
     -o data/processed/coconut_${SIZE} \
-    -s $SIZE --sa_max $SA_MAX --seed $SEED $NP_FLAG
+    -s $SIZE --sa_max $SA_MAX --seed $SEED
 
 python3 scripts/create_subset.py \
     -i data/raw/npass_full.csv \

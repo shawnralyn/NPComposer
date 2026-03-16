@@ -11,6 +11,7 @@
 #   make analyze-dist       Compare raw vs processed distributions
 #   make eval-shawn         Evaluate Shawn_model1 (superclass-conditioned)
 #   make eval-npgpt         Evaluate NPGPT baseline (unconditional)
+#   make molecule MODEL=npgpt   Generate & visualize a single molecule
 #   make eval-all           Run all model evaluations
 #   make test               Run pytest
 #   make apptainer          Build Apptainer SIF image
@@ -30,7 +31,6 @@ MAX_RINGS    ?= 10
 FP_DIM       ?= 3
 SEED         ?= 42
 N_JOBS       ?= -1
-NP_ROOT      ?= $(NP_CLASSIFIER_ROOT)
 TRAIN_RATIO  ?= 0.8
 VAL_RATIO    ?= 0.1
 TEST_RATIO   ?= 0.1
@@ -57,10 +57,20 @@ DEF_FILE     := npcomposer.def
 .PHONY: setup
 setup: ## Install Python dependencies
 	$(PIP) install -r requirements.txt
+	$(PIP) install matplotlib scipy -q
+
+.PHONY: setup-full
+setup-full: ## Full automated setup (deps + submodules + checkpoints)
+	bash setup.sh
+
+.PHONY: setup-gpu
+setup-gpu: ## Full setup with GPU-enabled PyTorch
+	bash setup.sh --gpu
 
 .PHONY: setup-dev
 setup-dev: ## Install all dependencies including dev/test
 	$(PIP) install -r requirements.txt
+	$(PIP) install matplotlib scipy -q
 
 # Data Download
 
@@ -103,7 +113,7 @@ subset-coconut: ## Create COCONUT subset
 		--fp_dim $(FP_DIM) \
 		--n_jobs $(N_JOBS) \
 		--seed $(SEED) \
-		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
+
 
 .PHONY: subset-npass
 subset-npass: ## Create NPASS subset
@@ -120,7 +130,7 @@ subset-npass: ## Create NPASS subset
 		--fp_dim $(FP_DIM) \
 		--n_jobs $(N_JOBS) \
 		--seed $(SEED) \
-		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
+
 
 # Merge Training Data
 
@@ -185,47 +195,68 @@ endif
 	$(PYTHON) src/evaluation/metrics.py \
 		-i $(INPUT) \
 		-o results.json \
-		$(if $(NP_ROOT),--np_root $(NP_ROOT),)
 
-# Model-specific Evaluations
+
+# ── New Unified Evaluation System ──────────────────────────────────────
 EVAL_SEEDS   ?= "1 2 3"
-EVAL_NUM     ?= 10
+EVAL_NUM     ?= 50
+
+.PHONY: eval-npgpt
+eval-npgpt: ## Evaluate NPGPT pretrained (unconditional)
+	$(PYTHON) src/evaluation/evaluate.py npgpt \
+		--seeds $(EVAL_SEEDS) --n_samples $(EVAL_NUM)
+
+.PHONY: eval-npgpt-rl
+eval-npgpt-rl: ## Evaluate NPGPT pretrained vs RL-finetuned
+	$(PYTHON) src/evaluation/evaluate.py npgpt-rl \
+		--seeds $(EVAL_SEEDS) --n_samples $(EVAL_NUM)
+
+.PHONY: eval-gpmolformer
+eval-gpmolformer: ## Evaluate GP-MoLFormer baseline
+	$(PYTHON) src/evaluation/evaluate.py gpmolformer \
+		--seeds $(EVAL_SEEDS) --n_samples $(EVAL_NUM)
+
+.PHONY: eval-npcomposer
+eval-npcomposer: ## Evaluate NPComposer (4 configs: QED+SA, 3 pathways)
+	$(PYTHON) src/evaluation/evaluate_shawn.py \
+		--seeds $(EVAL_SEEDS) --n_samples $(EVAL_NUM)
+
+.PHONY: eval-npcomposer-classify
+eval-npcomposer-classify: ## Evaluate NPComposer + pathway classification accuracy
+	$(PYTHON) src/evaluation/evaluate_shawn.py \
+		--seeds $(EVAL_SEEDS) --n_samples $(EVAL_NUM) --classify
+
+.PHONY: eval-compare
+eval-compare: ## Compare all models (bar chart + significance)
+	$(PYTHON) src/evaluation/compare_all_models.py
+
+.PHONY: eval-all
+eval-all: eval-npgpt-rl eval-gpmolformer eval-npcomposer eval-compare ## Run all evaluations + comparison
+
+# ── Molecule Generation ───────────────────────────────────────────────
+MODEL    ?= npgpt
+PROMPT   ?=
+
+.PHONY: molecule
+molecule: ## Generate & display a single molecule (MODEL=npgpt|npgpt-rl|gpmolformer|npcomposer PROMPT=...)
+	$(PYTHON) scripts/make_molecule.py $(MODEL) \
+		$(if $(PROMPT),--prompt "$(PROMPT)",)
+
+# ── Legacy Evaluation (shell scripts) ─────────────────────────────────
 EVAL_TOP     ?= 0
 
-.PHONY: eval-shawn
-eval-shawn: ## Evaluate Shawn_model1 (76 superclasses × NUM × SEEDS)
+.PHONY: eval-shawn-legacy
+eval-shawn-legacy: ## [Legacy] Evaluate Shawn_model1 via shell script
 	bash scripts/run_evaluation_Shawn_model1.sh \
 		--seeds $(EVAL_SEEDS) \
 		--num $(EVAL_NUM) \
 		$(if $(filter-out 0,$(EVAL_TOP)),--top $(EVAL_TOP),)
 
-.PHONY: eval-shawn-optimal
-eval-shawn-optimal: ## Evaluate Shawn_model1 with SA/QED optimal conditioning
-	bash scripts/run_evaluation_Shawn_model1_optimal.sh \
-		--seeds $(EVAL_SEEDS) \
-		--num $(EVAL_NUM) \
-		$(if $(filter-out 0,$(EVAL_TOP)),--top $(EVAL_TOP),)
-
-.PHONY: eval-shawn-pathway
-eval-shawn-pathway: ## Evaluate Shawn_model1 with pathway + SA/QED optimal
-	bash scripts/run_evaluation_Shawn_model1_pathway_optimal.sh \
-		--seeds $(EVAL_SEEDS)
-
-.PHONY: eval-npgpt
-eval-npgpt: ## Evaluate NPGPT baseline (unconditional generation)
+.PHONY: eval-npgpt-legacy
+eval-npgpt-legacy: ## [Legacy] Evaluate NPGPT via shell script
 	bash scripts/run_evaluation_NPGPT.sh \
 		--seeds $(EVAL_SEEDS) \
 		--num 760
-
-.PHONY: eval-npgpt-classify
-eval-npgpt-classify: ## Evaluate NPGPT + NPClassifier superclass distribution
-	bash scripts/run_evaluation_NPGPT.sh \
-		--seeds $(EVAL_SEEDS) \
-		--num 760 \
-		--classify
-
-.PHONY: eval-all
-eval-all: eval-shawn eval-npgpt ## Run all model evaluations
 
 # Distribution Analysis
 
@@ -329,5 +360,5 @@ help: ## Show available targets
 	@echo ""
 	@echo "Override variables:  make subset-coconut SIZE=100000 SA_MAX=5.0 SEED=123"
 	@echo "Evaluation:         make eval-shawn EVAL_NUM=10 EVAL_SEEDS='1 2 3' EVAL_TOP=3"
-	@echo "NPClassifier:      export NP_CLASSIFIER_ROOT=~/NP-Classifier && make all"
+	@echo "NPClassifier:      python src/evaluation/evaluate_shawn.py --classify"
 	@echo ""

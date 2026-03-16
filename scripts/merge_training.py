@@ -15,12 +15,6 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src" / "classification"))
-try:
-    from npclassifier import classify_batch
-    HAS_NPCLASSIFIER = True
-except ImportError:
-    HAS_NPCLASSIFIER = False
 
 
 SMILES_CANDIDATES = [
@@ -114,15 +108,27 @@ def fill_superclass(df, cache_dir="."):
     n_missing = missing.sum()
     print(f"Superclass: {len(df) - n_missing:,} filled, {n_missing:,} missing")
 
-    if n_missing > 0 and HAS_NPCLASSIFIER:
-        print(f"Classifying {n_missing:,} molecules via NPClassifier (local)...")
-        missing_smiles = df.loc[missing, "smiles"].tolist()
-        labels = classify_batch(missing_smiles, cache_dir=cache_dir, level="superclass")
-        df.loc[missing, "superclass"] = labels
-
-    elif n_missing > 0:
-        print("Warning: NPClassifier not available, filling with 'Unknown'")
-        df.loc[missing, "superclass"] = "Unknown"
+    if n_missing > 0:
+        try:
+            import requests, time
+            print(f"Classifying {n_missing:,} molecules via NPClassifier API...")
+            missing_smiles = df.loc[missing, "smiles"].tolist()
+            labels = []
+            for smi in missing_smiles:
+                try:
+                    r = requests.get("https://npclassifier.ucsd.edu/classify",
+                                     params={"smiles": smi}, timeout=30)
+                    r.raise_for_status()
+                    data = r.json()
+                    sc = data.get("superclass_results") or data.get("superclass")
+                    labels.append(sc[0] if isinstance(sc, list) and sc else "Unknown")
+                    time.sleep(0.5)
+                except Exception:
+                    labels.append("Unknown")
+            df.loc[missing, "superclass"] = labels
+        except ImportError:
+            print("Warning: 'requests' not installed, filling with 'Unknown'")
+            df.loc[missing, "superclass"] = "Unknown"
 
     return df
 

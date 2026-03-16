@@ -6,7 +6,7 @@ Evaluate generated molecules.
 
 ```bash
 python src/evaluation/metrics.py -i generated.txt -o results.json
-python src/evaluation/metrics.py -i generated.txt -o results.json --np_root ~/NP-Classifier
+python src/evaluation/metrics.py -i generated.txt -o results.json --classify
 ```
 
 **Input:** Text file with one SMILES per line.
@@ -41,5 +41,5 @@ python src/evaluation/metrics.py -i generated.txt -o results.json --np_root ~/NP
 
 | Flag | Description |
 |------|-------------|
-| `--np_root PATH` | Path to NP-Classifier repo (or set `NP_CLASSIFIER_ROOT` env) |
+| `--classify` | Run NPClassifier via UCSD API |
 | `--keep_np_per_mol` | Include per-molecule classification in output |

@@ -55,7 +55,7 @@ evaluation:
     - sa_score
     - qed
     - np_score
-  np_classifier_root: ${oc.env:NP_CLASSIFIER_ROOT,""}
+  # NPClassifier: uses UCSD API (https://npclassifier.ucsd.edu/classify)
 
 # NPASS Merge Settings
 npass_merge:

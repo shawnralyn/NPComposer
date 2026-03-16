@@ -89,11 +89,6 @@ if [ -f "$NOVELTY_REF" ]; then
     NOV_FLAG="--novelty_ref $NOVELTY_REF"
 fi
 
-# NP root flag
-NP_FLAG=""
-if [ -n "$NP_CLASSIFIER_ROOT" ]; then
-    NP_FLAG="--np_root $NP_CLASSIFIER_ROOT"
-fi
 
 # Generate and evaluate per seed
 for SEED in $SEEDS; do
@@ -130,33 +125,37 @@ for SEED in $SEEDS; do
     python3 src/evaluation/metrics.py \
         -i "$TXT_FILE" \
         -o "$RESULT_FILE" \
-        $NP_FLAG $TRAIN_FLAG $NOV_FLAG
+        $TRAIN_FLAG $NOV_FLAG
 
     # --- Step 4 (optional): NPClassifier distribution ---
     if [ "$CLASSIFY" = true ]; then
         CLASS_FILE="$OUTPUT_DIR/npgpt_seed${SEED}_classification.json"
-        echo "  Classifying with NPClassifier ..."
+        echo "  Classifying with NPClassifier API ..."
         python3 -c "
-import json, sys
-sys.path.insert(0, 'src/classification')
-from npclassifier import classify_batch_full
+import json, requests, time
+from collections import Counter
 
 with open('$TXT_FILE') as f:
     smiles_list = [line.strip() for line in f if line.strip()]
 
-results = classify_batch_full(smiles_list)
-
-# Count superclass distribution
-from collections import Counter
 superclass_counts = Counter()
-for r in results:
-    if r and r.get('superclass'):
-        for sc in r['superclass']:
-            superclass_counts[sc] += 1
+classified = 0
+for smi in smiles_list:
+    try:
+        r = requests.get('https://npclassifier.ucsd.edu/classify',
+                         params={'smiles': smi}, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        sc = data.get('superclass_results') or data.get('superclass')
+        if isinstance(sc, list) and sc:
+            for s in sc: superclass_counts[s] += 1
+            classified += 1
+        time.sleep(0.5)
+    except: pass
 
 output = {
     'total_molecules': len(smiles_list),
-    'classified': sum(1 for r in results if r and r.get('superclass')),
+    'classified': classified,
     'superclass_distribution': dict(superclass_counts.most_common()),
     'n_unique_superclasses': len(superclass_counts),
 }

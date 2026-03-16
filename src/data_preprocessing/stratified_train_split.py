@@ -1,10 +1,4 @@
-"""
-Stratified train/val/test split by natural product superclass and presence/absence of glycoside.
-
-- Exact (or very close) train/val/test molecule split
-- Preserves (superclass|glycoside) proportions (stratified)
-- Writes train.csv, val.csv, and test.csv
-"""
+"""Stratified train/val/test split by superclass and glycoside."""
 
 import argparse
 import pandas as pd
@@ -23,30 +17,21 @@ def stratified_split_3way(
     val_frac: float = 0.1,
     seed: int = 42
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Perform a stratified 3-way split of a DataFrame into train, validation, and test sets.
+    """Perform stratified 3-way split into train, val, test.
 
-    Splits the input DataFrame while preserving the distribution of classes in the
-    specified stratification column across all three resulting sets. The test fraction
-    is computed as 1 - train_frac - val_frac.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame to split.
-        strata_col (str): Name of the column to use for stratification.
-        train_frac (float): Fraction of data for training set (default: 0.8).
-        val_frac (float): Fraction of data for validation set (default: 0.1).
-        seed (int): Random seed for reproducibility (default: 42).
-
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: A tuple of three DataFrames (train, val, test).
-
-    Raises:
-        ValueError: If train_frac + val_frac >= 1.0.
+    Input:
+        df: DataFrame to split.
+        strata_col: Column name for stratification.
+        train_frac: Training fraction (default 0.8).
+        val_frac: Validation fraction (default 0.1).
+        seed: Random seed (default 42).
+    Output:
+        tuple: (train_df, val_df, test_df)
     """
     test_frac = 1.0 - train_frac - val_frac
     if test_frac <= 0:
         raise ValueError("train_frac + val_frac must be < 1.0")
 
-    # 1) Split train
     train, temp = train_test_split(
         df,
         test_size=(1.0 - train_frac),
@@ -55,7 +40,6 @@ def stratified_split_3way(
         shuffle=True,
     )
 
-    # 2) Split val/test
     val_share_of_temp = val_frac / (val_frac + test_frac)
 
     val, test = train_test_split(
@@ -70,26 +54,20 @@ def stratified_split_3way(
 
 
 def main() -> None:
-    """Command-line interface for stratified train/val/test splitting of a COCONUT database CSV.
+    """Split COCONUT CSV into stratified train/val/test sets.
 
-    Reads an input CSV, creates a composite stratification column from superclass and
-    glycoside columns, filters out strata with too few samples for reliable splitting,
-    performs a stratified 3-way split, and writes the resulting train, validation, and
-    test sets to separate CSV files. Also prints per-stratum statistics to verify
-    that class proportions are preserved across splits.
-
-    CLI Arguments:
-        --input: Path to input CSV file.
-        --smiles_col: Name of the SMILES column (default: 'canonical_smiles').
-        --superclass_col: Name of the NPClassifier superclass column (default: 'np_classifier_superclass').
-        --glycoside_col: Name of the glycoside indicator column (default: 'np_classifier_is_glycoside').
-        --train_frac: Fraction of data for training (default: 0.8).
-        --val_frac: Fraction of data for validation (default: 0.1).
-        --seed: Random seed for reproducibility (default: 42).
-        --min_class_count: Minimum samples per stratum to include (default: 10).
-        --out_train: Output path for training CSV (default: 'data/splits/train_v2.csv').
-        --out_val: Output path for validation CSV (default: 'data/splits/val_v2.csv').
-        --out_test: Output path for test CSV (default: 'data/splits/test_v2.csv').
+    Input:
+        --input: Input CSV path.
+        --smiles_col: SMILES column name (default: canonical_smiles).
+        --superclass_col: Superclass column name (default: np_classifier_superclass).
+        --glycoside_col: Glycoside column name (default: np_classifier_is_glycoside).
+        --train_frac: Training fraction (default: 0.8).
+        --val_frac: Validation fraction (default: 0.1).
+        --seed: Random seed (default: 42).
+        --min_class_count: Min samples per stratum (default: 10).
+        --out_train: Output training CSV (default: data/splits/train_v2.csv).
+        --out_val: Output validation CSV (default: data/splits/val_v2.csv).
+        --out_test: Output test CSV (default: data/splits/test_v2.csv).
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True, help="Input CSV path")
@@ -124,29 +102,24 @@ def main() -> None:
     df: pd.DataFrame = pd.read_csv(args.input, low_memory=False)
     print("Length of original df:", len(df))
 
-    # Define columns that must be present (SMILES, superclass, glycoside)
     keep_cols = [args.smiles_col, args.superclass_col, args.glycoside_col]
 
     missing = [col for col in keep_cols if col not in df.columns]
     if missing:
         raise ValueError(f"Missing required column(s): {', '.join(missing)}")
 
-    # Drop rows where any required value is missing (NaN) or blank ("") in SMILES, superclass, or glycoside columns
     df = df.dropna(subset=keep_cols).copy()
     for col in keep_cols:
         df = df[df[col].astype(str).str.strip() != ""].copy()
     print("Length of df after removing missing/unknown values:", len(df))
 
-    # Create a composite stratum label by combining superclass and glycoside columns
     df["_strata"] = (
         df[args.superclass_col].astype(str) + "|" + df[args.glycoside_col].astype(str)
     )
 
-    # Remove strata that are too small for a 3-way split
     vc = df["_strata"].value_counts()
     df = df[df["_strata"].map(vc).ge(args.min_class_count)].copy()
 
-    # Perform stratified 3-way split (train/val/test) using the composite stratum
     train, val, test = stratified_split_3way(
         df, "_strata", args.train_frac, args.val_frac, args.seed
     )
@@ -160,7 +133,6 @@ def main() -> None:
     print(f"Saved {args.out_val}:   {len(val):,} ({len(val)/total:.3f})")
     print(f"Saved {args.out_test}:  {len(test):,} ({len(test)/total:.3f})")
 
-    # count per stratum splits
     counts = pd.DataFrame({
         "total": df["_strata"].value_counts(),
         "train": train["_strata"].value_counts(),
@@ -178,10 +150,6 @@ def main() -> None:
     print(counts)
     print(f"Number of strata: {counts.shape[0]}")
 
-    # Count total possible strata before filtering
-    total_possible_strata = df["_strata"].nunique()
-
-    # Count number of strata retained after filtering for min_class_count
     retained_strata = df["_strata"].nunique()
     print(
         f"Number of strata retained (>= {args.min_class_count} samples): {retained_strata}")

@@ -39,13 +39,6 @@ try:
 except ImportError:
     HAS_TQDM = False
 
-# NPClassifier classification (local server preferred)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src" / "classification"))
-try:
-    from npclassifier import classify_batch
-    HAS_NPCLASSIFIER = True
-except ImportError:
-    HAS_NPCLASSIFIER = False
 
 
 def _torch_nearest(X, centers, data_chunk=4096, center_chunk=20000):
@@ -570,9 +563,6 @@ def main():
                         help="Parallel workers (-1 = all cores, 1 = single)")
     parser.add_argument("--classify", action="store_true",
                         help="Run NPClassifier superclass classification (off by default)")
-    parser.add_argument("--np_root",
-                        default=os.environ.get("NP_CLASSIFIER_ROOT"),
-                        help="Path to NP-Classifier repo clone (or set NP_CLASSIFIER_ROOT env)")
     args = parser.parse_args()
 
     global N_JOBS
@@ -588,23 +578,27 @@ def main():
 
     subset = kmeans_subset(df, smiles_col, args.size, args.seed, fp_dim=args.fp_dim)
 
-    # NPClassifier superclass classification (only with --classify flag)
+    # NPClassifier superclass classification via API (only with --classify flag)
     if args.classify:
-        if not HAS_NPCLASSIFIER:
-            print("Warning: NPClassifier module not available, skipping classification")
-        elif not args.np_root:
-            print("Warning: NP_CLASSIFIER_ROOT not set, skipping classification. "
-                  "Set via --np_root or export NP_CLASSIFIER_ROOT=<path>")
-        else:
-            print("Classifying superclass (NPClassifier local model)...")
-            cache_dir = str(out_path.parent)
-            superclasses = classify_batch(
-                subset[smiles_col].tolist(),
-                cache_dir=cache_dir,
-                repo_root=args.np_root,
-                level="superclass",
-            )
+        try:
+            import requests, time
+            print("Classifying superclass via NPClassifier API...")
+            smiles_list = subset[smiles_col].tolist()
+            superclasses = []
+            for smi in (tqdm(smiles_list, desc="NPClassifier API") if HAS_TQDM else smiles_list):
+                try:
+                    r = requests.get("https://npclassifier.ucsd.edu/classify",
+                                     params={"smiles": smi}, timeout=30)
+                    r.raise_for_status()
+                    data = r.json()
+                    sc = data.get("superclass_results") or data.get("superclass")
+                    superclasses.append(sc[0] if isinstance(sc, list) and sc else None)
+                    time.sleep(0.5)
+                except Exception:
+                    superclasses.append(None)
             subset['superclass'] = superclasses
+        except ImportError:
+            print("Warning: 'requests' not installed, skipping classification")
 
     csv_path = f"{args.output}.csv"
     id_col = save_subset(subset, csv_path, smiles_col)
