@@ -153,9 +153,9 @@ EVAL_CONFIGS = {"optimal_params": {
 for _pw, _color in zip(ALL_PATHWAYS, _PATHWAY_COLORS):
     _key = "pathway_" + _pw.split()[0].lower().rstrip("s")
     EVAL_CONFIGS[_key] = {
-        "prompt": f"<np_classifier_pathway:{_pw}>{_BASE_TOKENS}",
+        "prompt": f"<np_classifier_pathway:{_pw}>",
         "pathway": _pw,
-        "label": f"{_PATHWAY_SHORT[_pw]} + QED+SA",
+        "label": _PATHWAY_SHORT[_pw],
         "color": _color,
     }
 
