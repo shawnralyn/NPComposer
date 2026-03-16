@@ -17,7 +17,7 @@ By providing class labels and molecular property information as special tokens d
 
 ![NPGPT-RL Pipeline](docs/npgpt_rl_pipeline.png)
 
-NPGPT-RL is an RL-finetuned version of [NPGPT](https://github.com/ohuelab/npgpt), a SMILES-based GPT model for unconditional molecular generation (~2.6M parameters). The pretrained NPGPT model is fine-tuned using the REINFORCE policy gradient algorithm with a multi-objective reward function that combines molecular validity (w=1.0), QED drug-likeness (w=0.3), synthetic accessibility (w=0.3, inverted), and NP-likeness (w=0.4), with a −0.5 penalty for invalid SMILES and KL regularization. A frozen copy of the pretrained model serves as a KL divergence reference to prevent mode collapse. Checkpoints are evaluated every 50 steps via sweep, with step 600 selected as the best checkpoint.
+NPGPT-RL is an RL-finetuned version of [NPGPT](https://github.com/ohuelab/npgpt), a SMILES-based GPT model for unconditional molecular generation (~2.6M parameters). The pretrained NPGPT model is fine-tuned using the REINFORCE policy gradient algorithm with a multi-objective reward function that combines molecular validity (w=1.0), QED drug-likeness (w=0.3), synthetic accessibility (w=0.3, inverted), and NP-likeness (w=0.4), with a −0.5 penalty for invalid SMILES and KL regularization. A frozen copy of the pretrained model serves as a KL divergence reference to prevent mode collapse. Checkpoints are evaluated every 50 steps via sweep, with step 600 selected as the best checkpoint. The RL fine-tuning approach is based on [Thomas et al. (2025)](https://doi.org/10.1021/acs.jcim.5c02053).
 
 
 ## Checkpoints
@@ -391,6 +391,23 @@ AceGen was referenced as an RL framework for applying policy gradient methods to
   year={2024},
   publisher={ACS Publications},
   doi={10.1021/acs.jcim.4c00895}
+}
+```
+
+### REINFORCE-ING CLMs (RL Algorithm Reference)
+
+The REINFORCE policy gradient algorithm and its practical components (baseline subtraction, reward shaping, KL regularization) for chemical language models were referenced from this work.
+
+```bibtex
+@article{thomas2025reinforcing,
+  title={REINFORCE-ING Chemical Language Models for Drug Discovery},
+  author={Thomas, Morgan and Bou, Albert and G{\'o}mez-Tamayo, Jose Carlos and Tresadern, Gary and Ahmad, Mazen and De Fabritiis, Gianni},
+  journal={Journal of Chemical Information and Modeling},
+  volume={65},
+  pages={12752--12763},
+  year={2025},
+  publisher={ACS Publications},
+  doi={10.1021/acs.jcim.5c02053}
 }
 ```
 
