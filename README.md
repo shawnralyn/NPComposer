@@ -11,7 +11,7 @@ A platform for training, evaluating, and comparing SMILES-based language models 
 
 NPComposer is a conditional molecular generation model trained by fine-tuning [GP-MoLFormer](https://huggingface.co/ibm-research/GP-MoLFormer-Uniq) — a 46.8M parameter transformer decoder foundation model — on the [COCONUT database](https://coconut.naturalproducts.net) containing over 700,000 experimentally validated natural products.
 
-By providing class labels and molecular property information as special tokens during model fine-tuning, NPComposer allows for conditional natural product generation based on: NP biosynthesis pathway (7 pathways including Alkaloids, Terpenoids, Shikimates and Phenylpropanoids, etc.), NP superclass (100+ superclasses), presence or absence of glycoside, number of aromatic rings (0–22), QED drug-likeness (0–1), and synthetic accessibility score (1–10).
+By providing class labels and molecular property information as special tokens during model fine-tuning, NPComposer allows for conditional natural product generation based on: NP biosynthesis pathway (7 pathways including Alkaloids, Terpenoids, Shikimates and Phenylpropanoids, etc.), NP superclass (70+ superclasses), presence or absence of glycoside, number of aromatic rings (0–22), QED drug-likeness (0–1), and synthetic accessibility score (1–10).
 
 ### NPGPT-RL
 
@@ -228,7 +228,7 @@ NPComposer uses special tokens as conditioning prompts during generation. All av
 | Token Type | Example | Count |
 |------------|---------|-------|
 | Pathway | `<np_classifier_pathway:Alkaloids>` | 7 |
-| Superclass | `<np_classifier_superclass:Flavonoids>` | 100+ |
+| Superclass | `<np_classifier_superclass:Flavonoids>` | 70+ |
 | Glycoside | `<np_classifier_is_glycoside:True>` | 2 |
 | Aromatic rings | `<aromatic_rings_count:3>` | 22 (0–22) |
 | QED bin | `<qed_bin:0.9<=qed<1>` | 10 (0.0–1.0, step 0.1) |
