@@ -230,8 +230,13 @@ eval-npcomposer-classify: ## Evaluate NPComposer + pathway classification accura
 eval-compare: ## Compare all models (bar chart + significance)
 	$(PYTHON) src/evaluation/compare_all_models.py
 
+.PHONY: eval-benchmark
+eval-benchmark: ## Benchmark generation speed (50 mol x 3 seeds per model)
+	$(PYTHON) src/evaluation/benchmark_speed.py \
+		--n_molecules 50 --seeds "1 2 3"
+
 .PHONY: eval-all
-eval-all: eval-npgpt-rl eval-gpmolformer eval-npcomposer eval-compare ## Run all evaluations + comparison
+eval-all: eval-npgpt-rl eval-gpmolformer eval-npcomposer eval-compare eval-benchmark ## Run all evaluations + comparison + benchmark
 
 # ── Molecule Generation ───────────────────────────────────────────────
 MODEL    ?= npgpt

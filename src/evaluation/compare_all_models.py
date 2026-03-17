@@ -278,6 +278,170 @@ METRICS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Speed benchmark loading & plotting
+# ---------------------------------------------------------------------------
+
+def load_speed_benchmark(benchmark_dir):
+    """Load speed benchmark results.
+
+    Input:
+        benchmark_dir: path to results/benchmark directory.
+    Output:
+        dict with config and results, or None.
+    """
+    path = Path(benchmark_dir) / "speed_benchmark.json"
+    return _safe_load(path)
+
+
+def _extract_mean_std(value):
+    """Extract mean and std from a benchmark value (supports both old and new formats).
+
+    Input:
+        value: scalar (old format) or dict with mean/std (new format).
+    Output:
+        (mean, std) tuple.
+    """
+    if isinstance(value, dict):
+        return value.get("mean", 0), value.get("std", 0)
+    return value, 0
+
+
+def plot_speed_panel(speed_data, models, out_path):
+    """Plot generation speed with error bars.
+
+    Input:
+        speed_data: loaded speed benchmark JSON.
+        models: list of ModelResult (for consistent color mapping).
+        out_path: output PNG path.
+    """
+    if not speed_data or "results" not in speed_data:
+        return
+
+    bench_results = speed_data["results"]
+    cfg = speed_data.get("config", {})
+    device_str = cfg.get("device", "unknown")
+    n_mol = cfg.get("n_molecules", "?")
+    seeds = cfg.get("seeds", [])
+
+    # Build name->color map from ModelResult for consistent colors
+    color_map = {}
+    for m in models:
+        name_lower = m.name.lower()
+        color_map[name_lower] = m.color
+    fallback_colors = ["#5DADE2", "#1F618D", "#F39C12", "#9B59B6", "#2ECC71"]
+
+    names, pm_means, pm_stds = [], [], []
+    tp_means, tp_stds = [], []
+    tt_means, tt_stds = [], []
+    colors = []
+
+    for i, r in enumerate(bench_results):
+        bname = r["model"]
+        names.append(bname)
+
+        m, s = _extract_mean_std(r["per_molecule_s"])
+        pm_means.append(m); pm_stds.append(s)
+        m, s = _extract_mean_std(r["molecules_per_min"])
+        tp_means.append(m); tp_stds.append(s)
+        m, s = _extract_mean_std(r["total_time_s"])
+        tt_means.append(m); tt_stds.append(s)
+
+        # Match color
+        matched = False
+        for key, col in color_map.items():
+            bn = bname.lower().replace(" ", "").replace("(", "").replace(")", "")
+            kn = key.replace(" ", "").replace("(", "").replace(")", "")
+            if bn in kn or kn in bn:
+                colors.append(col)
+                matched = True
+                break
+        if not matched:
+            colors.append(fallback_colors[i % len(fallback_colors)])
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5.5))
+
+    # Panel 1: Per-molecule time
+    bars = axes[0].bar(names, pm_means, yerr=pm_stds, capsize=5,
+                       color=colors, edgecolor="white", alpha=0.88,
+                       error_kw={"lw": 1.5, "capthick": 1.5})
+    axes[0].set_ylabel("Time per molecule (s)")
+    axes[0].set_title("Generation Speed", fontsize=12, fontweight="bold")
+    for bar, m, s in zip(bars, pm_means, pm_stds):
+        axes[0].text(bar.get_x() + bar.get_width()/2, bar.get_height() + s + 0.002,
+                     f"{m:.3f}s", ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    # Panel 2: Throughput
+    bars = axes[1].bar(names, tp_means, yerr=tp_stds, capsize=5,
+                       color=colors, edgecolor="white", alpha=0.88,
+                       error_kw={"lw": 1.5, "capthick": 1.5})
+    axes[1].set_ylabel("Molecules / min")
+    axes[1].set_title("Throughput", fontsize=12, fontweight="bold")
+    for bar, m, s in zip(bars, tp_means, tp_stds):
+        axes[1].text(bar.get_x() + bar.get_width()/2, bar.get_height() + s + 0.5,
+                     f"{m:.0f}", ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    # Panel 3: Total time
+    bars = axes[2].bar(names, tt_means, yerr=tt_stds, capsize=5,
+                       color=colors, edgecolor="white", alpha=0.88,
+                       error_kw={"lw": 1.5, "capthick": 1.5})
+    axes[2].set_ylabel("Total time (s)")
+    axes[2].set_title(f"Total Time ({n_mol} mol/seed)", fontsize=12, fontweight="bold")
+    for bar, m, s in zip(bars, tt_means, tt_stds):
+        axes[2].text(bar.get_x() + bar.get_width()/2, bar.get_height() + s + 0.2,
+                     f"{m:.1f}s", ha="center", va="bottom", fontsize=8, fontweight="bold")
+
+    for ax in axes:
+        ax.tick_params(axis="x", rotation=20, labelsize=8)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.grid(axis="y", alpha=0.25)
+
+    seed_info = f"seeds {seeds}" if seeds else ""
+    fig.suptitle(f"Generation Speed Benchmark  —  {device_str}  ({seed_info})",
+                 fontsize=13, fontweight="bold", y=0.98)
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
+    plt.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Speed benchmark plot saved -> {out_path}")
+
+
+def print_speed_table(speed_data):
+    """Print speed benchmark as formatted table with mean ± std.
+
+    Input:
+        speed_data: loaded speed benchmark JSON.
+    """
+    if not speed_data or "results" not in speed_data:
+        return
+
+    cfg = speed_data.get("config", {})
+    device_str = cfg.get("device", "unknown")
+    n_mol = cfg.get("n_molecules", "?")
+    seeds = cfg.get("seeds", [])
+
+    seed_str = f"{n_mol} mol × {len(seeds)} seeds" if seeds else f"{n_mol} molecules"
+    print(f"\n{'='*78}")
+    print(f"  GENERATION SPEED BENCHMARK  ({seed_str}, {device_str})")
+    print(f"{'='*78}")
+    print(f"  {'Model':<25} {'Total (s)':>14} {'Per mol (s)':>16} {'mol/min':>14} {'Valid%':>12}")
+    print(f"  {'-'*74}")
+    for r in speed_data["results"]:
+        t_m, t_s = _extract_mean_std(r["total_time_s"])
+        p_m, p_s = _extract_mean_std(r["per_molecule_s"])
+        tp_m, tp_s = _extract_mean_std(r["molecules_per_min"])
+        v_m, v_s = _extract_mean_std(r.get("validity", 0))
+        if t_s > 0:
+            print(f"  {r['model']:<25} "
+                  f"{t_m:>6.2f}±{t_s:<5.2f} "
+                  f"{p_m:>7.4f}±{p_s:<6.4f} "
+                  f"{tp_m:>6.1f}±{tp_s:<5.1f} "
+                  f"{v_m*100:>5.1f}±{v_s*100:<4.1f}%")
+        else:
+            print(f"  {r['model']:<25} {t_m:>14.2f} {p_m:>16.4f} "
+                  f"{tp_m:>14.1f} {v_m*100:>11.1f}%")
+    print(f"{'='*78}")
+
+
 def plot_comparison(models, metric_pairs, out_path, title=None):
     """Plot multi-panel comparison of all models.
 
@@ -446,6 +610,9 @@ Examples:
                              "'all', 'adjacent', or '0-1,0-2,...' (0-indexed)")
     parser.add_argument("--title", type=str, default=None,
                         help="Custom figure title")
+    parser.add_argument("--benchmark_dir", type=str,
+                        default=str(PROJECT_ROOT / "results" / "benchmark"),
+                        help="Directory with speed benchmark results")
     parser.add_argument("--save_json", action="store_true", default=True,
                         help="Save comparison summary JSON")
 
@@ -523,10 +690,24 @@ Examples:
                 entry[f"{mk}_pvalue"] = p
                 entry[f"{mk}_sig"] = significance_stars(p)
 
+        # Include speed data in JSON if available
+        speed_data = load_speed_benchmark(args.benchmark_dir)
+        if speed_data:
+            summary["speed_benchmark"] = speed_data
+
         json_path = OUT_DIR / "comparison_summary.json"
         with open(json_path, "w") as f:
             json.dump(summary, f, indent=2, default=str)
         print(f"\nJSON summary -> {json_path}")
+
+    # ── Speed benchmark ──────────────────────────────────────────────────
+    speed_data = load_speed_benchmark(args.benchmark_dir)
+    if speed_data:
+        plot_speed_panel(speed_data, models, OUT_DIR / "speed_benchmark_comparison.png")
+        print_speed_table(speed_data)
+    else:
+        print(f"\nNo speed benchmark found at {args.benchmark_dir}/speed_benchmark.json")
+        print("  Run: python src/evaluation/benchmark_speed.py")
 
     print("\nDone!")
 
