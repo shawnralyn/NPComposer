@@ -73,16 +73,21 @@ def generate_npgpt(model, tokenizer, temperature=1.5, top_p=1.0):
         return tokenizer.decode(out[0], skip_special_tokens=True).strip()
 
 
-def load_hf_model(ckpt_path):
+GPMOLFORMER_TOKENIZER = "ibm-research/MoLFormer-XL-both-10pct"
+
+
+def load_hf_model(ckpt_path, tokenizer_name=None):
     """Load HuggingFace causal LM.
 
     Input:
         ckpt_path: model name or path.
+        tokenizer_name: tokenizer name/path (defaults to ckpt_path).
     Output:
         (model, tokenizer)
     """
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(ckpt_path, trust_remote_code=True)
+    tok_path = tokenizer_name or ckpt_path
+    tokenizer = AutoTokenizer.from_pretrained(tok_path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         ckpt_path, trust_remote_code=True, torch_dtype=torch.float32
     ).eval()
@@ -100,7 +105,14 @@ def generate_hf(model, tokenizer, prompt="", temperature=1.0, top_p=0.95, max_ne
         SMILES string.
     """
     device = next(model.parameters()).device
-    x = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
+    if prompt:
+        x = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
+    else:
+        # Empty prompt: start with BOS token
+        bos_id = tokenizer.bos_token_id
+        if bos_id is None:
+            bos_id = tokenizer.cls_token_id or 0
+        x = {"input_ids": torch.tensor([[bos_id]])}
     prompt_len = x["input_ids"].shape[1]
     x = {k: v.to(device) for k, v in x.items()}
 
@@ -257,7 +269,7 @@ def main():
     elif args.model == "gpmolformer":
         temp = args.temperature if args.temperature is not None else 1.0
         print(f"Loading GP-MoLFormer: {args.gpmolformer_ckpt}")
-        model, tok = load_hf_model(args.gpmolformer_ckpt)
+        model, tok = load_hf_model(args.gpmolformer_ckpt, tokenizer_name=GPMOLFORMER_TOKENIZER)
         if torch.cuda.is_available():
             model = model.to("cuda")
         gen_fn = lambda: generate_hf(model, tok, prompt="", temperature=temp)

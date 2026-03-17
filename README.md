@@ -184,11 +184,18 @@ Generate a single valid molecule with RDKit visualization:
 make molecule MODEL=npgpt
 make molecule MODEL=npgpt-rl
 make molecule MODEL=gpmolformer
-make molecule MODEL=npcomposer PROMPT="<np_classifier_pathway:Alkaloids><qed_bin:0.9<=qed<1><sa_bin:1<=sa<2>"
+
+# NPComposer with pathway conditioning
+make molecule MODEL=npcomposer PROMPT="<np_classifier_pathway:Alkaloids>"
+make molecule MODEL=npcomposer PROMPT="<np_classifier_pathway:Amino acids and Peptides>"
+make molecule MODEL=npcomposer PROMPT="<np_classifier_pathway:Fatty acids>"
+make molecule MODEL=npcomposer PROMPT="<np_classifier_pathway:Terpenoids>"
 
 # Direct script
 python scripts/make_molecule.py npgpt-rl --temperature 1.5
-python scripts/make_molecule.py npcomposer --prompt "<np_classifier_pathway:Terpenoids>"
+python scripts/make_molecule.py npcomposer --prompt "<np_classifier_pathway:Alkaloids>"
+python scripts/make_molecule.py npcomposer --prompt "<np_classifier_pathway:Amino acids and Peptides>"
+python scripts/make_molecule.py npcomposer --prompt "<np_classifier_pathway:Fatty acids>"
 ```
 
 The script retries until a valid SMILES is produced (up to 50 attempts), saves a PNG image, displays it (iTerm2 inline / Kitty / sixel / macOS Preview), and prints the canonical SMILES.
