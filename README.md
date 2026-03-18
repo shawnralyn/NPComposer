@@ -19,6 +19,11 @@ By providing class labels and molecular property information as special tokens d
 
 NPGPT-RL is an RL-finetuned version of [NPGPT](https://github.com/ohuelab/npgpt), a SMILES-based GPT model for unconditional molecular generation (~2.6M parameters). The pretrained NPGPT model is fine-tuned using the REINFORCE policy gradient algorithm with a multi-objective reward function that combines molecular validity (w=1.0), QED drug-likeness (w=0.3), synthetic accessibility (w=0.3, inverted), and NP-likeness (w=0.4), with a −0.5 penalty for invalid SMILES and KL regularization. A frozen copy of the pretrained model serves as a KL divergence reference to prevent mode collapse. Checkpoints are evaluated every 50 steps via sweep, with step 600 selected as the best checkpoint. The RL fine-tuning approach is based on [Thomas et al. (2025)](https://doi.org/10.1021/acs.jcim.5c02053).
 
+### NPComposer-Drug (NP→Drug Generation)
+
+NPComposer-Drug fine-tunes GP-MoLFormer using PEFT LoRA to generate drug-like analogs of natural products. Given a natural product SMILES as input, the model generates candidate molecules that preserve structural features of the source NP while shifting toward drug-like chemical space.
+
+Training uses 380,000 COCONUT×ChEMBL pairs generated via FAISS Hamming search on Morgan fingerprints. Only ~885k parameters are trained (LoRA rank 16 on query/key/value projections, ~1.9% of the 47M backbone). The training format is `[CLS][NP_SMILES][UNK][drug_SMILES][SEP]` with loss computed only on drug tokens.
 
 ## Checkpoints
 
@@ -31,6 +36,7 @@ The NPComposer model is available on Hugging Face, and NPGPT checkpoints (pretra
 |----------|------|
 | NPComposer (HuggingFace) | https://huggingface.co/ralyn/NPComposer-v2/tree/main |
 | NPGPT Checkpoints (Google Drive) | https://drive.google.com/drive/u/0/folders/1N0qUxMJWN6szxo-HCSikyCip2FY2aSsg |
+| NPComposer-Drug LoRA checkpoint (Google Drive) | https://drive.google.com/file/d/1X_Au66rSYGc3Z4DDdHxkCNYana4CJVfd/view?usp=drive_link |
 
 
 ## Quick Start
@@ -65,9 +71,12 @@ NPComposer/
 │   └── splits/                     # Train/Val/Test splits
 ├── src/
 │   ├── training/
-│   │   └── train.py                # NPComposer fine-tuning
+│   │   ├── train.py                # NPComposer fine-tuning
+│   │   ├── train_np_drug_pairs.py  # NP→drug LoRA pair-tuning
 │   ├── inference/
-│   │   └── inference.py            # NPComposer conditional generation
+│   │   ├── inference.py            # NPComposer conditional generation
+│   │   └── infer_np_drug.py        # NP→drug inference (single SMILES or batch CSV)
+
 │   ├── npgpt-rl/
 │   │   ├── train_rl.py             # REINFORCE RL fine-tuning for NPGPT
 │   │   ├── reward.py               # Multi-objective reward (validity + QED + SA + NP-likeness)
@@ -76,13 +85,21 @@ NPComposer/
 │   ├── evaluation/
 │   │   ├── evaluate.py             # Unified evaluation (NPGPT + GP-MoLFormer)
 │   │   ├── evaluate_shawn.py       # NPComposer evaluation (7 pathway + optimal configs)
+│   │   ├── eval_np_drug_pairs.py   # NP→drug evaluation (recovery rate, Tanimoto metrics)
 │   │   ├── compare_all_models.py   # Cross-model comparison bar chart
 │   │   ├── compute_metrics.py      # Standalone metrics computation
 │   │   └── make_plots.py           # Plot generation utilities
 │   └── data_preprocessing/
 │       ├── bin_cont_variables.py   # QED/SA bin definitions for conditioning tokens
 │       ├── rdkit_metrics.py        # RDKit-based molecular property calculations
-│       └── stratified_train_split.py  # Stratified train/val/test splitting
+│       ├── stratified_train_split.py  # Stratified train/val/test splitting
+│       └── np_drug/
+│           ├── clean_coconut_npdrug.py   # COCONUT cleaning for NP→drug pipeline
+│           ├── clean_ChEMBL.py           # ChEMBL cleaning for NP→drug pipeline
+│           ├── generate_ChEMBL_pairs.py  # FAISS-based NP×drug pair generation
+│           ├── build_faiss_index.py      # Build FAISS binary index from fingerprints
+│           ├── morgan_fingerprints.py    # Packed uint8 Morgan fingerprint utilities
+│           └── bin_cont_variables_npdrug.py  # Property binning for NP→drug pairs
 ├── scripts/
 │   ├── make_molecule.py            # Single molecule generation + visualization
 │   ├── create_subset.py            # K-means subset creation in Tanimoto space
@@ -253,6 +270,69 @@ All 7 NPClassifier pathways:
 ```
 Alkaloids, Amino acids and Peptides, Carbohydrates, Fatty acids,
 Polyketides, Shikimates and Phenylpropanoids, Terpenoids
+```
+
+
+## NP→Drug Pipeline
+
+NPComposer-Drug learns to generate drug-like analogs of natural products via pair-tuning on COCONUT×ChEMBL molecule pairs.
+
+### Data Preparation
+
+```bash
+make clean-coconut-npdrug   # Clean COCONUT (standardize columns, compute SA score)
+make clean-chembl-npdrug    # Clean ChEMBL drug subset
+make generate-pairs         # FAISS Hamming search → ~380k NP×drug pairs
+# Or run all three:
+make pipeline-np-drug
+```
+
+Pairs are generated by encoding both datasets as packed uint8 Morgan fingerprints (ECFP4, 2048 bits), building a FAISS `IndexBinaryFlat` over ChEMBL, and querying each COCONUT NP for its nearest ChEMBL neighbors by Tanimoto similarity.
+
+### Training (LoRA)
+
+```bash
+make train-np-drug-lora                                    # rank 16, 50 epochs, lr 1e-4
+make train-np-drug-lora LORA_RANK=32 TRAIN_EPOCHS=100      # custom settings
+```
+
+### Evaluation
+
+```bash
+make eval-np-drug-lora    # synthetic test pairs (Tanimoto recovery at 0.3/0.4/0.5/0.6)
+make eval-np-drug-real    # real validated NP→drug pairs (data/processed/np_drug.csv)
+```
+
+| Metric | Definition |
+|--------|-----------|
+| Validity | % generated SMILES that parse |
+| Uniqueness | unique valid / total valid |
+| Mean QED | drug-likeness of generated molecules |
+| Tanimoto → source | structural similarity to input NP |
+| Tanimoto → target | structural similarity to known paired drug |
+| Recovery rate | % test NPs where best candidate Tanimoto ≥ threshold (0.3/0.4/0.5/0.6) |
+
+### Inference
+
+```bash
+# Single NP SMILES
+make infer-np-drug SMILES="CC1=CC2=C(C=C1)C(=O)C3=CC=CC=C3C2=O"
+
+# Batch from CSV
+python src/evaluation/infer_np_drug.py \
+    --checkpoint models/np_drug_lora_r16/final \
+    --input-csv  data/my_nps.csv \
+    --lora --k 25 --output-csv results/candidates.csv
+```
+
+### Make Targets
+
+```bash
+make pipeline-np-drug               # Clean COCONUT + ChEMBL + generate pairs
+make train-np-drug-lora             # Train LoRA model
+make eval-np-drug-lora              # Eval on synthetic test pairs
+make eval-np-drug-real              # Eval on real NP→drug pairs
+make infer-np-drug SMILES="CCO..."  # Generate candidates for a single NP
 ```
 
 

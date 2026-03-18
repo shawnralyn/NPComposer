@@ -327,6 +327,8 @@ def main():
     ap.add_argument("--bf16",           action="store_true",
                     help="Use bfloat16 (recommended for Ampere+ GPUs on RunPod)")
     ap.add_argument("--seed",           type=int,   default=None)
+    ap.add_argument("--resume-from-checkpoint", type=str, default=None,
+                    help="Path to checkpoint to resume from, or 'latest' to auto-detect")
     # Evaluation
     ap.add_argument("--k",              type=int,   default=10,
                     help="Molecules generated per val input during training (default: 10)")
@@ -439,9 +441,19 @@ def main():
         k=args.k,
     )
 
+    # Resolve checkpoint to resume from
+    resume = args.resume_from_checkpoint
+    if resume == "latest":
+        import glob as _glob
+        ckpts = sorted(_glob.glob(os.path.join(args.output_dir, "checkpoint-*")),
+                       key=lambda p: int(p.split("-")[-1]))
+        resume = ckpts[-1] if ckpts else None
+        if resume:
+            print(f"  Resuming from {resume}")
+
     print("\nStarting training...")
     print(f"  {len(ds_train):,} train pairs  |  {steps_per_epoch} steps/epoch  |  {args.num_epochs} epochs")
-    trainer.train()
+    trainer.train(resume_from_checkpoint=resume)
 
     # Save final model
     trainer.save_model(os.path.join(args.output_dir, "final"))

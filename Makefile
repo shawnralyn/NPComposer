@@ -17,6 +17,12 @@
 #   make apptainer          Build Apptainer SIF image
 #   make clean              Remove generated artifacts
 #   make help               Show this help
+#
+#   make pipeline-np-drug       NP→drug data pipeline (clean COCONUT + ChEMBL + generate pairs)
+#   make train-np-drug-lora     Train NP→drug LoRA model
+#   make eval-np-drug-lora      Evaluate LoRA on synthetic test pairs
+#   make eval-np-drug-real      Evaluate LoRA on real NP→drug pairs
+#   make infer-np-drug SMILES=  Generate drug candidates for a single NP
 
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
@@ -35,6 +41,19 @@ TRAIN_RATIO  ?= 0.8
 VAL_RATIO    ?= 0.1
 TEST_RATIO   ?= 0.1
 N_SAMPLES    ?= 1000
+
+# NP→Drug pipeline
+CHEMBL_CSV      ?= data/raw/chembl_drugs.csv
+COCONUT_CLEAN   ?= data/processed/coconut_npdrug.csv
+CHEMBL_CLEAN    ?= data/processed/chembl_npdrug.csv
+PAIRS_CSV       ?= data/processed/ChEMBL_pairs.csv
+LORA_DIR        ?= models/np_drug_lora_r16
+LORA_RANK       ?= 16
+TRAIN_EPOCHS    ?= 50
+TRAIN_BATCH     ?= 256
+TRAIN_LR        ?= 1e-4
+K               ?= 10
+WANDB_PROJECT   ?= npcomposer
 
 # Paths (aligned with conf/config.yaml)
 DATA_RAW       := data/raw
@@ -143,6 +162,81 @@ merge-training: ## Merge COCONUT + NPASS subsets into training_data.csv
 		--npass $(DATA_PROCESSED)/npass_$(SIZE).csv \
 		-o $(TRAINING_DATA)
 
+# ── NP→Drug Pipeline ──────────────────────────────────────────────────
+
+.PHONY: clean-coconut-npdrug
+clean-coconut-npdrug: ## Clean COCONUT for NP→drug pipeline
+	@mkdir -p $(DATA_PROCESSED)
+	$(PYTHON) src/data_preprocessing/np_drug/clean_coconut_npdrug.py \
+		--input  $(COCONUT_CSV) \
+		--output $(COCONUT_CLEAN)
+
+.PHONY: clean-chembl-npdrug
+clean-chembl-npdrug: ## Clean ChEMBL for NP→drug pipeline
+	@test -f $(CHEMBL_CSV) || { echo "Error: $(CHEMBL_CSV) not found."; exit 1; }
+	@mkdir -p $(DATA_PROCESSED)
+	$(PYTHON) src/data_preprocessing/np_drug/clean_ChEMBL.py \
+		--input  $(CHEMBL_CSV) \
+		--output $(CHEMBL_CLEAN)
+
+.PHONY: generate-pairs
+generate-pairs: ## Generate COCONUT×ChEMBL FAISS pairs
+	@test -f $(COCONUT_CLEAN) || { echo "Error: run make clean-coconut-npdrug first."; exit 1; }
+	@test -f $(CHEMBL_CLEAN)  || { echo "Error: run make clean-chembl-npdrug first."; exit 1; }
+	$(PYTHON) src/data_preprocessing/np_drug/generate_ChEMBL_pairs.py \
+		--coconut $(COCONUT_CLEAN) \
+		--chembl  $(CHEMBL_CLEAN) \
+		--output  $(PAIRS_CSV)
+
+.PHONY: train-np-drug-lora
+train-np-drug-lora: ## Train NP→drug LoRA model
+	@test -f $(PAIRS_CSV) || { echo "Error: $(PAIRS_CSV) not found. Run make generate-pairs first."; exit 1; }
+	$(PYTHON) src/training/train_np_drug_pairs.py \
+		--pairs-csv  $(PAIRS_CSV) \
+		--output-dir $(LORA_DIR) \
+		--num-epochs $(TRAIN_EPOCHS) \
+		--batch-size $(TRAIN_BATCH) \
+		--lr         $(TRAIN_LR) \
+		--lora \
+		--lora-rank  $(LORA_RANK) \
+		--no-eval \
+		--save-epochs 5 \
+		--wandb-project $(WANDB_PROJECT)
+
+.PHONY: eval-np-drug-lora
+eval-np-drug-lora: ## Evaluate LoRA checkpoint on synthetic test pairs
+	$(PYTHON) src/evaluation/eval_np_drug_pairs.py \
+		--checkpoint $(LORA_DIR)/final \
+		--test-csv   $(LORA_DIR)/test_pairs.csv \
+		--lora --lora-rank $(LORA_RANK) \
+		--k $(K) \
+		--output-csv $(LORA_DIR)/eval_results.csv
+
+.PHONY: eval-np-drug-real
+eval-np-drug-real: ## Evaluate LoRA checkpoint on real NP→drug pairs
+	$(PYTHON) src/evaluation/eval_np_drug_pairs.py \
+		--checkpoint      $(LORA_DIR)/final \
+		--test-csv        $(NP_DRUG_DATA) \
+		--np-smiles-col   parent_np_smiles \
+		--drug-smiles-col drug_smiles \
+		--lora --lora-rank $(LORA_RANK) \
+		--k $(K) \
+		--output-csv $(LORA_DIR)/eval_real_pairs.csv
+
+.PHONY: infer-np-drug
+infer-np-drug: ## Generate drug candidates for a single NP (SMILES=<smiles>)
+ifndef SMILES
+	$(error SMILES is required. Usage: make infer-np-drug SMILES="CCO...")
+endif
+	$(PYTHON) src/evaluation/infer_np_drug.py \
+		--checkpoint $(LORA_DIR)/final \
+		--smiles "$(SMILES)" \
+		--lora --lora-rank $(LORA_RANK) \
+		--k $(K)
+
+.PHONY: pipeline-np-drug
+pipeline-np-drug: clean-coconut-npdrug clean-chembl-npdrug generate-pairs ## Full NP→drug data pipeline
+
 # Create Drug Discovery Dataset
 
 .PHONY: create-drug-dataset
@@ -236,7 +330,7 @@ eval-benchmark: ## Benchmark generation speed (50 mol x 3 seeds per model)
 		--n_molecules 50 --seeds "1 2 3"
 
 .PHONY: eval-all
-eval-all: eval-npgpt-rl eval-gpmolformer eval-npcomposer eval-compare eval-benchmark ## Run all evaluations + comparison + benchmark
+eval-all: eval-npgpt-rl eval-gpmolformer eval-npcomposer eval-compare eval-benchmark eval-np-drug-lora eval-np-drug-real ## Run all evaluations + comparison + benchmark
 
 # ── Molecule Generation ───────────────────────────────────────────────
 MODEL    ?= npgpt
