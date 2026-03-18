@@ -1,3 +1,21 @@
+"""Minimal NPComposer inference smoke test.
+
+This script loads the `ralyn/NPComposer-v2` Hugging Face checkpoint, generates a
+single SMILES string conditioned on a provided NPClassifier token, and then
+validates + scores the molecule with RDKit.
+
+Outputs:
+- The decoded generated text (truncated at the first '.' to keep the first SMILES).
+- QED and SA scores if the SMILES parses successfully.
+
+Usage:
+    python src/inference/test_inference.py
+
+Notes:
+- This is intended as a quick sanity check (not a benchmark).
+- Generation uses nucleus sampling (`top_p`) and temperature sampling.
+"""
+
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from rdkit import Chem
 from rdkit.Chem import QED
