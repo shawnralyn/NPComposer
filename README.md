@@ -265,7 +265,7 @@ Multiple tokens can be combined in a single prompt:
 prompt = "<np_classifier_pathway:Alkaloids><qed_bin:0.9<=qed<1><sa_bin:1<=sa<2>"
 ```
 
-*Note: Certain special tokens can potentially be incompatible with one another (i.e. triterpenoid superclass with low SA score), and therefore care must be taken to ensure compatibility between conditioning tokens when writing prompts for obtaining optimal model performance.
+*Note: Certain special tokens can potentially be incompatible with one another (i.e. a complex structural superclass like triterpenoids with low SA score).  Therefore care must be taken to ensure compatibility between conditioning tokens when writing prompts for obtaining optimal generation quality. 
 
 All 7 NPClassifier pathways:
 
