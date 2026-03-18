@@ -1,3 +1,47 @@
+"""Run NPComposer inference from a YAML config file.
+
+This script loads a Hugging Face causal language model checkpoint (e.g., NPComposer),
+builds optional conditioning prompts using NPComposer v2 special tokens, generates
+SMILES strings via stochastic decoding, and writes the results to disk.
+
+It supports two modes:
+
+1) Single-prompt mode (default)
+   - Build a prompt from individual conditioning arguments (pathway, superclass,
+     glycoside flag, aromatic ring count, QED bin, SA bin), OR use a provided
+     legacy prompt (`--np_class`), OR fall back to the YAML `inference.np_class`.
+   - Generate `num_molecules` SMILES strings for that prompt and write one SMILES
+     per line to `inference.output_file` (or `--output`).
+
+2) Batch special-token mode (`--generate_all_pathway_superclass`)
+   - Requires `--special_tokens_map` pointing to a `special_tokens_map.json`.
+   - Extracts all pathway/superclass special tokens (e.g., "<np_classifier_pathway:...>",
+     "<np_classifier_superclass:...>").
+   - Generates `num_molecules` SMILES strings for each token and writes one output
+     text file per token into `--output_dir`.
+
+Generation details:
+- Uses `transformers.AutoTokenizer` and `transformers.AutoModelForCausalLM` with
+  `trust_remote_code=True`.
+- Uses nucleus sampling (`top_p`) and temperature sampling (`temperature`).
+- Limits continuation length with `max_new_tokens` (default: 200).
+- Post-processes decoded output by taking the first fragment before '.'.
+
+Configuration:
+- `--yaml` is required and should contain an `inference` section with keys like:
+  `ckpt_path`, `output_file`, `num_molecules`, `top_p`, `temperature`, and optional `seed`.
+
+Device:
+- If CUDA is available, the model and prompt tensors are moved to GPU.
+
+Examples:
+    python src/inference/inference.py --yaml configs/inference.yml
+    python src/inference/inference.py --yaml configs/inference.yml --num_molecules 100
+    python src/inference/inference.py --yaml configs/inference.yml --pathway Alkaloids --qed_bin "0.6<=qed<0.7"
+    python src/inference/inference.py --yaml configs/inference.yml --generate_all_pathway_superclass \
+        --special_tokens_map path/to/special_tokens_map.json --output_dir outputs/classes
+"""
+
 import argparse
 import json
 import re

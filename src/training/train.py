@@ -1,3 +1,33 @@
+"""Fine-tune NPComposer (a causal language model for SMILES) from CSV splits using a YAML config.
+
+This script trains a Hugging Face `AutoModelForCausalLM` on SMILES strings optionally
+conditioned on NPComposer v2 special tokens (e.g., pathway, superclass, glycoside flag,
+aromatic ring count, QED bin, SA bin). It:
+
+- Loads a base model + tokenizer from `configs["base"]`.
+- Builds a set of conditioning special tokens from the training CSV columns and adds
+  them to the tokenizer vocabulary, then resizes the model embeddings accordingly.
+- Constructs a training text field of the form:
+    "<pathway:...> <superclass:...> <is_glycoside:...> <aromatic_rings_count:...> <qed_bin:...> <sa_bin:...> SMILES<EOS>"
+- Tokenizes the dataset with truncation and filters out overlong sequences.
+- Uses a custom data collator that can stochastically drop conditioning tokens during
+  training (conditioning dropout) and masks special tokens from loss computation.
+- Runs training/evaluation via `transformers.Trainer` and `TrainingArguments`,
+  then saves the model and optionally pushes it to the Hugging Face Hub.
+
+Inputs:
+- `--yaml`: path to a YAML configuration file defining model, columns, and training args.
+- `--train_csv`, `--val_csv`, `--test_csv`: dataset splits as CSV files.
+
+Outputs:
+- A trained checkpoint written to `training.output_dir` (from the YAML), plus Trainer logs.
+- If enabled in the YAML, a push to the Hugging Face Hub.
+
+Example:
+    python src/training/train.py --yaml configs/train.yml \
+        --train_csv data/train.csv --val_csv data/val.csv --test_csv data/test.csv
+"""
+
 import os
 import argparse
 import yaml
