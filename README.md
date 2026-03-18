@@ -247,7 +247,7 @@ Reward function (in `reward.py`):
 
 ## Conditioning Tokens
 
-NPComposer uses special tokens as conditioning prompts during generation. All available tokens are defined in the model's `special_tokens_map.json`:
+NPComposer uses special tokens as conditioning prompts during generation. All available tokens for conditional generation are defined in the file: `docs/npcomposer_special_tokens_map.json`:
 
 | Token Type | Example | Count |
 |------------|---------|-------|

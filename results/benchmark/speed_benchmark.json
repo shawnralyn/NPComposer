@@ -1,0 +1,166 @@
+{
+  "config": {
+    "n_molecules": 3,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "device": "mps (Apple Silicon)",
+    "device_type": "mps"
+  },
+  "results": [
+    {
+      "model": "GP-MoLFormer",
+      "device": "mps (Apple Silicon)",
+      "n_molecules": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "warmup_time_s": 3.838,
+      "total_time_s": {
+        "mean": 5.044,
+        "std": 0.216,
+        "values": [
+          5.327,
+          5.003,
+          4.803
+        ]
+      },
+      "per_molecule_s": {
+        "mean": 1.6814,
+        "std": 0.0721,
+        "values": [
+          1.7758,
+          1.6677,
+          1.6008
+        ]
+      },
+      "molecules_per_min": {
+        "mean": 35.7,
+        "std": 1.5,
+        "values": [
+          33.8,
+          36.0,
+          37.5
+        ]
+      },
+      "validity": {
+        "mean": 1.0,
+        "std": 0.0,
+        "values": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "per_seed": [
+        {
+          "seed": 1,
+          "n_generated": 3,
+          "n_valid": 3,
+          "validity": 1.0,
+          "total_time_s": 5.327292790985666,
+          "per_molecule_s": 1.7757642636618887,
+          "molecules_per_min": 33.788268650181706
+        },
+        {
+          "seed": 2,
+          "n_generated": 3,
+          "n_valid": 3,
+          "validity": 1.0,
+          "total_time_s": 5.003179166989867,
+          "per_molecule_s": 1.6677263889966223,
+          "molecules_per_min": 35.97712454265273
+        },
+        {
+          "seed": 3,
+          "n_generated": 3,
+          "n_valid": 3,
+          "validity": 1.0,
+          "total_time_s": 4.802504165971186,
+          "per_molecule_s": 1.6008347219903953,
+          "molecules_per_min": 37.480446404485214
+        }
+      ]
+    },
+    {
+      "model": "NPComposer",
+      "device": "mps (Apple Silicon)",
+      "n_molecules": 3,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "warmup_time_s": 21.974,
+      "total_time_s": {
+        "mean": 27.218,
+        "std": 0.645,
+        "values": [
+          26.79,
+          28.129,
+          26.734
+        ]
+      },
+      "per_molecule_s": {
+        "mean": 9.0726,
+        "std": 0.2149,
+        "values": [
+          8.9301,
+          9.3763,
+          8.9114
+        ]
+      },
+      "molecules_per_min": {
+        "mean": 6.6,
+        "std": 0.2,
+        "values": [
+          6.7,
+          6.4,
+          6.7
+        ]
+      },
+      "validity": {
+        "mean": 0.5556,
+        "std": 0.3143,
+        "values": [
+          1.0,
+          0.3333,
+          0.3333
+        ]
+      },
+      "per_seed": [
+        {
+          "seed": 1,
+          "n_generated": 3,
+          "n_valid": 3,
+          "validity": 1.0,
+          "total_time_s": 26.790191750013037,
+          "per_molecule_s": 8.930063916671012,
+          "molecules_per_min": 6.718876881495722
+        },
+        {
+          "seed": 2,
+          "n_generated": 3,
+          "n_valid": 1,
+          "validity": 0.3333333333333333,
+          "total_time_s": 28.128881916985847,
+          "per_molecule_s": 9.376293972328616,
+          "molecules_per_min": 6.399116770130332
+        },
+        {
+          "seed": 3,
+          "n_generated": 3,
+          "n_valid": 1,
+          "validity": 0.3333333333333333,
+          "total_time_s": 26.734196792007424,
+          "per_molecule_s": 8.911398930669142,
+          "molecules_per_min": 6.732949615071795
+        }
+      ]
+    }
+  ]
+}
