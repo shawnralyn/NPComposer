@@ -1,90 +1,120 @@
 # Data preprocessing for model training
 
-This repository’s training pipeline expects **CSV splits** (train/val/test) containing a SMILES column plus any conditioning label columns used by NPComposer (e.g., pathway/superclass/QED bin/SA bin).
+This repository’s training pipeline expects **CSV splits** (train/val/test) containing a SMILES column plus any conditioning label columns used by NPComposer.
 
-This README documents a **minimal preprocessing path** based on the three scripts in the top-level `scripts/` folder:
+This README documents the **current minimal preprocessing path** implemented in `src/data_preprocessing/` (not the top-level `scripts/` folder). Run the scripts in this order:
 
-- `scripts/create_subset.py`
-- `scripts/merge_training.py`
-- `scripts/split_data.py`
-
-If you want a different preprocessing flow (e.g., stratified splits, NP-drug pairing), see `src/data_preprocessing/`.
+1. `src/data_preprocessing/rdkit_metrics.py`
+2. `src/data_preprocessing/bin_cont_variables.py`
+3. `src/data_preprocessing/stratified_train_split.py`
 
 ---
 
 ## 0) Inputs / assumptions
 
-- You have one or more source datasets exported as CSVs (e.g., COCONUT, NPASS).
-- Each CSV must contain a SMILES-like column (common names that are auto-detected in `merge_training.py` include: `canonical_smiles`, `SMILES`, `smiles`, `Canonical_SMILES`, `smi`).
+- You start from a **COCONUT-like CSV** that contains at least:
+  - `canonical_smiles` (SMILES string)
+  - `qed_drug_likeliness` (continuous QED score)
+  - `np_classifier_superclass` (NPClassifier superclass label)
+  - `np_classifier_is_glycoside` (boolean/flag-like glycoside label)
+
+If your file uses different column names, either rename columns up-front or pass the appropriate CLI options where supported.
 
 ---
 
-## 1) Create a representative subset (optional)
+## 1) Compute RDKit metrics (`rdkit_metrics.py`)
 
-Use `scripts/create_subset.py` to downsample a large natural products dataset into a smaller, diverse subset.
+`rdkit_metrics.py` computes **synthetic accessibility (SA) score** from `canonical_smiles` and writes an updated CSV with a new `sa_score` column.
 
-`create_subset.py` can:
-- Filter/score molecules using RDKit-derived properties (e.g., SA score, QED; and NP-likeness if available).
-- Build Morgan fingerprints.
-- Select a diverse subset via **mini-batch K-means** over a combined feature space (fingerprints + properties).
+### What it does
 
-Typical usage (example):
+- Reads the input CSV and drops rows missing `canonical_smiles`.
+- Parses SMILES with RDKit.
+- Computes `sa_score` using `rdkit.Contrib.SA_Score.sascorer`.
+- Writes the updated CSV.
+
+### Usage
 
 ```bash
-python scripts/create_subset.py --help
+python src/data_preprocessing/rdkit_metrics.py \
+  --coconut path/to/coconut.csv \
+  --out_file path/to/coconut_with_sa.csv
 ```
 
-Notes:
-- If PyTorch is installed, K-means can use GPU/CPU via torch; otherwise it falls back to scikit-learn.
-- Output is a CSV subset you can then merge/split.
+### Output
+
+- Adds:
+  - `sa_score`: float (may be empty/NaN if RDKit parsing fails)
 
 ---
 
-## 2) Merge datasets into one training CSV
+## 2) Bin continuous variables (`bin_cont_variables.py`)
 
-Use `scripts/merge_training.py` to combine two subset CSVs (COCONUT + NPASS) into a single deduplicated training dataset.
+`bin_cont_variables.py` converts continuous `qed_drug_likeliness` and `sa_score` values into **string bin labels** (`qed_bin`, `sa_bin`). These binned columns can be used as conditioning labels.
 
-What it does:
-- Loads both CSVs and adds a `source` column (`coconut` or `npass`).
-- Detects and renames the SMILES column to a standard `smiles`.
-- Concatenates and **deduplicates by `smiles`**.
-- Ensures a `superclass` column exists:
-  - Fills from existing columns in priority order: `superclass` → `np_classifier_superclass` → `chemical_super_class`.
-  - For remaining missing values, it queries the **NPClassifier API** and fills unknowns as `"Unknown"`.
+### What it does
 
-Example:
+- Requires columns `qed_drug_likeliness` and `sa_score`.
+- Drops rows with missing values in those columns.
+- Creates bins:
+  - QED: `[0.0, 0.1), [0.1, 0.2), ..., [0.9, 1.0)`
+  - SA: `[1, 2), [2, 3), ..., [9, 10)`
+- Writes the updated CSV.
+
+### Usage
 
 ```bash
-python scripts/merge_training.py \
-  --coconut data/processed/coconut_subset.csv \
-  --npass data/processed/npass_subset.csv \
-  -o data/processed/training_merged.csv
+python src/data_preprocessing/bin_cont_variables.py \
+  --input_csv path/to/coconut_with_sa.csv \
+  --output path/to/coconut_with_sa_and_bins.csv
 ```
 
-Notes:
-- NPClassifier lookup requires the `requests` package.
-- The script currently queries `https://npclassifier.ucsd.edu/classify` with a short delay; this may be slow for large numbers of missing labels.
+### Output
+
+- Adds:
+  - `qed_bin`: string label like `0.3<=qed<0.4`
+  - `sa_bin`: string label like `4<=sa<5`
 
 ---
 
-## 3) Split into train/val/test
+## 3) Stratified train/val/test split (`stratified_train_split.py`)
 
-Use `scripts/split_data.py` to create random splits.
+`stratified_train_split.py` creates train/val/test splits using **stratification over a combined stratum** of:
 
-Example:
+- superclass (`np_classifier_superclass` by default), and
+- glycoside flag (`np_classifier_is_glycoside` by default)
+
+This helps keep label proportions similar across splits.
+
+### What it does
+
+- Loads the input CSV.
+- Drops rows with missing/blank values in the required columns.
+- Builds a stratum key: `superclass|glycoside`.
+- Drops strata with fewer than `--min_class_count` rows (default: 10) to ensure 3-way stratification is feasible.
+- Writes split CSVs.
+
+### Usage
 
 ```bash
-python scripts/split_data.py \
-  -i data/processed/training_merged.csv \
-  -o data/splits/ \
-  --train 0.8 --val 0.1 --test 0.1 \
-  --seed 42
+python src/data_preprocessing/stratified_train_split.py \
+  --input path/to/coconut_with_sa_and_bins.csv \
+  --smiles_col canonical_smiles \
+  --superclass_col np_classifier_superclass \
+  --glycoside_col np_classifier_is_glycoside \
+  --train_frac 0.8 \
+  --val_frac 0.1 \
+  --seed 42 \
+  --min_class_count 10 \
+  --out_train data/splits/train_v2.csv \
+  --out_val data/splits/val_v2.csv \
+  --out_test data/splits/test_v2.csv
 ```
 
-This writes:
-- `data/splits/train.csv`
-- `data/splits/val.csv`
-- `data/splits/test.csv`
+### Notes
+
+- Test fraction is computed as `1 - train_frac - val_frac`.
+- If you need different stratification behavior, edit how `_strata` is constructed in the script.
 
 ---
 
@@ -95,22 +125,21 @@ Once you have CSV splits, run training via:
 ```bash
 python src/training/train.py \
   --yaml conf/train.yaml \
-  --train_csv data/splits/train.csv \
-  --val_csv data/splits/val.csv \
-  --test_csv data/splits/test.csv
+  --train_csv data/splits/train_v2.csv \
+  --val_csv data/splits/val_v2.csv \
+  --test_csv data/splits/test_v2.csv
 ```
 
-Ensure that the columns referenced in `conf/train.yaml` exist in the split CSVs.
+Ensure that the columns referenced in `conf/train.yaml` exist in the split CSVs (e.g., `canonical_smiles`, `np_classifier_superclass`, `np_classifier_is_glycoside`, and optionally `qed_bin` / `sa_bin`).
 
 ---
 
 ## Troubleshooting
 
-### “No SMILES column found”
-`merge_training.py` only auto-detects a short list of SMILES column names. Rename your SMILES column to one of the supported names or edit `SMILES_CANDIDATES` in `merge_training.py`.
+### Missing required columns
+- `rdkit_metrics.py` expects `canonical_smiles`.
+- `bin_cont_variables.py` expects `qed_drug_likeliness` and `sa_score`.
+- `stratified_train_split.py` expects the columns passed via `--smiles_col`, `--superclass_col`, `--glycoside_col`.
 
-### Very slow `merge_training.py`
-If many rows are missing `superclass`, the NPClassifier API calls can dominate runtime.
-
-### Split ratios error
-`split_data.py` requires `train + val + test == 1.0`.
+### Stratified split error / too few samples per class
+If you get errors from stratified splitting, increase dataset size, decrease `--min_class_count`, or reduce the number of strata (e.g., stratify only by superclass).
