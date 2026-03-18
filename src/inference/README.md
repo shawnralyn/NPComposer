@@ -1,6 +1,6 @@
 # Inference
 
-This folder contains simple scripts for running inference (generation) with trained NPComposer-style models.
+This folder contains simple scripts for running inference with trained models.
 
 ## Files
 
