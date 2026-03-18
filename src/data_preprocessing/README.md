@@ -2,7 +2,7 @@
 
 This repository’s training pipeline expects **CSV splits** (train/val/test) containing a SMILES column plus any conditioning label columns used by NPComposer.
 
-This README documents the **current minimal preprocessing path** implemented in `src/data_preprocessing/` (not the top-level `scripts/` folder). Run the scripts in this order:
+This README documents the **current minimal preprocessing path** implemented in `src/data_preprocessing/`. Run the scripts in this order:
 
 1. `src/data_preprocessing/rdkit_metrics.py`
 2. `src/data_preprocessing/bin_cont_variables.py`
